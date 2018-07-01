@@ -5,7 +5,7 @@ all:
 	$(CC) $(CFLAGS) -I$(PREFIX)/include theowm.c -L$(PREFIX)/lib -lX11 -o theowm
 
 install:
-	install -pm 755 theowm /home/theo/bin
+	install -pm 755 theowm $(DESTDIR)/bin
 
 clean:
 	rm -f theowm
