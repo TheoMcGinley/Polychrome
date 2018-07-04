@@ -124,6 +124,7 @@ int main(void)
         if(ev.type == KeyPress && ev.xkey.subwindow != None) { 
 			//Window w = XCreateSimpleWindow(dpy, DefaultRootWindow(dpy), 200, 200, 200, 200, 4, CopyFromParent, 0);
 			spawn_terminal();
+			printf( "KeyPress: %x\n", ev.xkey.keycode );
 			//XMapRaised(dpy, w);
 			//XMapWindow(dpy, w);
             //XRaiseWindow(dpy, ev.xkey.subwindow);
@@ -136,13 +137,12 @@ int main(void)
              */
             XGetWindowAttributes(dpy, ev.xbutton.subwindow, &attr);
             start = ev.xbutton;
-			printf("STARTEVXBUTTON\n");
+			printf("Coordinates of window saved\n");
         }
         /* we only get motion events when a button is being pressed,
          * but we still have to check that the drag started on a window */
         else if(ev.type == MotionNotify && start.subwindow != None)
         {
-			printf("MOTION\n");
             /* here we could "compress" motion notify events by doing:
              *
              * while(XCheckTypedEvent(dpy, MotionNotify, &ev));
@@ -183,12 +183,12 @@ int main(void)
                 attr.y + (start.button==1 ? ydiff : 0),
                 MAX(1, attr.width + (start.button==3 ? xdiff : 0)),
                 MAX(1, attr.height + (start.button==3 ? ydiff : 0)));
-			printf("GOT TO END 1\n");
+			printf("Window move completed\n");
         }
         else if(ev.type == ButtonRelease)
         {
             start.subwindow = None;
-			printf("GOT TO END 2\n");
+			printf("mouse unclicked\n");
         }
     }
 }
