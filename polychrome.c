@@ -2,7 +2,6 @@
 //refactored common patterns; added a focused window tracker; removed
 //handle_creation
 
-//TODO fix shell_command (doesn't like some commands e.g. spaces)
 //TODO proper error handling 
 /*TODO force close if WM_DELETE_WINDOW doesn't go through
 	see line 295 of https://github.com/i3/i3/blob/next/src/x.c */
@@ -19,6 +18,7 @@
 #include <stdio.h> //printf
 #include <unistd.h> //NULL, exit, fork, sleep
 #include <stdlib.h> //NULL, malloc, free, exit, system
+#include <paths.h>
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define NUMCOLORS 4
@@ -69,7 +69,14 @@ void spawn_terminal() {
 	}
 }
 
-void shell_command(char * command) {
+void start_app(const char *command) {
+
+	if (fork() == 0) {
+		execl(_PATH_BSHELL, _PATH_BSHELL, "-c", command, NULL);
+	}
+}
+
+/*void shell_command(char * command) {
 	pid_t pid = fork();
 	if (pid == 0) {
 		setsid();
@@ -77,7 +84,7 @@ void shell_command(char * command) {
 		execlp("/bin/sh", "sh", "-C", command, NULL);
 		exit(1);
 	}
-}
+}*/
 
 int main(void) {
     XEvent ev;
@@ -216,47 +223,42 @@ static void destroy_active_window() {
 
 //use xev to find correct keysyms
 static void handle_key_press(XKeyEvent *e) {
-	//if(ev.xkey.subwindow != None) { 
 	switch(e->keycode) {
 		case 36: // enter
-			//spawn_terminal(); 
-			//system("xterm");
-			shell_command("xterm");
+			start_app("urxvt");
 			break;
 		case 38: // "a"
-			printf("a\n");
 			focus_color(0);
 			break;
 		case 39: // "s"
-			printf("s\n");
 			focus_color(1);
 			break;
 		case 40: // "d"
-			printf("d\n");
 			focus_color(2);
 			break;
 		case 41: // "f"
-			printf("f\n");
 			focus_color(3);
 			break;
 		case 24: // "q"
-			printf("q\n");
 			destroy_active_window();
 			break;
+		case 27: // "r"
+			start_app("java -jar ~/vlt/RuneLite.jar");
+			break;
+		case 33: // "p"
+			start_app("scrot -u ~/pix/scrots/%Y-%m-%d-%T-screenshot.png");
+			break;
 		case 52: // "z"
-			printf("z");
-			//system("mpc toggle");
-			shell_command("mpc\ toggle");
+			start_app("mpc toggle -q");
 			break;
 		case 53: // "x"
-			printf("x\n");
-			//shell_command("mpc next");
-			shell_command("qutebrowser");
-			//system("qutebrowser");
+			start_app("mpc next -q");
 			break;
 		case 54: // "c"
-			printf("c\n");
-			shell_command("~/bin/nextalbum");
+			start_app("nextalbum");
+			break;
+		case 56: // "b"
+			start_app("firefox");
 			break;
 	}
 }
@@ -270,7 +272,6 @@ static void add_to_windowlist(Window w, int windowcolor) {
 
 	WindowNode *newnode = malloc(sizeof(*newnode));
 	newnode->id = w;
-	//newnode->color = windowcolor;
 	newnode->next = NULL;
 	wn->next = newnode;
 }
@@ -279,7 +280,6 @@ static void add_to_windowlist(Window w, int windowcolor) {
 static void handle_window_map(XMapEvent *e) {
 	
 	//find rarest color and update tracker
-	printf("mapping, part 1\n");
 	int minvalue = colortracker[0];
 	int mincolor = 0;
 	for (int i=1; i<NUMCOLORS; i++) {
@@ -294,21 +294,14 @@ static void handle_window_map(XMapEvent *e) {
 	//add window to relevant linked list
 	add_to_windowlist(e->window, mincolor);
 
-	sleep(1);
-	printf("mapping, part 2\n");
 	XSetWindowBorderWidth(e->display, e->window, 10);
-	//XSetWindowBorder(e->display, e->window, color_to_pixel_value(mincolor));
 
 	//focus new window, setting border of old focus back to regular color
 	if (focused.id != NOID) {
 		reset_focused_border();
 	}
 
-	sleep(1);
-	printf("mapping, part 3\n");
 	focus_window(e->window, mincolor);
-	sleep(1);
-	printf("mapping, part 4\n");
 }
 
 
