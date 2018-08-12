@@ -11,9 +11,11 @@ Polychrome uses a sloppy, grid-based window placement system, logically dividing
 * Window focus on colour: An easier, more intuitive way to select windows
 * Virtual desktops: users can swap between many virtual desktops, allowing for effective window management without the need for minimization (and subsequently a taskbar)
   * Stickiness: windows can be assigned as "sticky", persisting between workspaces
-  * Bezelless mode: As an alternative to multiple monitors, a fixed portion of the screen can be assigned as sticky, effectively allowing that portion to act as another screen (windows within the allocated space persist regardless of what actions are happening on the rest of the screen)
+  * Bezelless mode: As an alternative to multiple monitors, a fixed portion of the screen can be assigned as sticky, effectively allowing that portion to act as another screen (windows within the allocated space persist regardless of what
+  actions are happening on the rest of the screen)
 * pseudo-fullscreen: allows for centering and enlarging a window without actually allowing the window to take up the entire screen (useful for larger monitors)
 * anti image retention: an option to slightly move all windows on a regular basis, preventing image retention and burn-in problems that can often be found in larger monitors
+* Exemption from grid: Users can define certain classes of windows to be exempt from the grid, and instead define preset positions and sizes for the windows
 
 ## Drawbacks
 * Requires a non-trivial amount of learning to become adept with the window manager

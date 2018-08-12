@@ -1,32 +1,29 @@
-//TODO proper error handling
-//https://www.google.com/search?q=xlib+error+handling&ie=utf-8&oe=utf-8&client=firefox-b-ab
-//TODO "XDestroyWindow" doesn't actually kill the program:
-//https://stackoverflow.com/questions/10792361/how-do-i-gracefully-exit-an-x11-event-loop
-//TODO fix children taking on border colour of parent
-//TODO replace all case 38: with case XStringToKeySYm("a") etc.
-//TODO paint selected window a different colour (pixmap pattern?)
-//TODO fix firefox (and other) breakages
-//TODO make keybind for:
+//TODO consider adding a variable for focusedwindow - easier to keep track of
+//logical focus
+//TODO fix improper colouring if pkill used 
+//TODO fix shell_command (doesn't like some commands e.g. spaces)
+//TODO proper error handling 
+/*TODO force close if WM_DELETE_WINDOW doesn't go through
+	see line 295 of https://github.com/i3/i3/blob/next/src/x.c */
+//TODO use hints to determine window size:
+//http://neuron-ai.tuke.sk/hudecm/Tutorials/C/special/xlib-programming/xlib-programming-2.html
+//TODO fix shell, then make keybinds for:
 	//mpc toggle
 	//mpc next
 	//nextalbum
-	//qutebrowser
-
-
-//#include "theowm.h"
+	//firefox
+//TODO rename .nix expressions from theowm -> polychrome
 
 #include <X11/Xlib.h>
-
-// THEO PERSONAL INCLUSION
-#include <stdio.h>
-
-//included because included in aemw
-#include <unistd.h>
-#include <stdlib.h>
+#include <stdio.h> //printf
+#include <unistd.h> //NULL, exit, fork, sleep
+#include <stdlib.h> //NULL, malloc, free, exit, system
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define NUMCOLORS 4
 #define NUMBUCKETS 20
+#define FOCUSCOLOR 16777111 //soft yellow
+				 //16777215 // white
 
 struct WindowNode {
 	Window id;
@@ -35,16 +32,34 @@ struct WindowNode {
 struct WindowNode;
 typedef struct WindowNode WindowNode;
 
-static int initialise();
+//Polychrome Window
+struct PWindow {
+	Window id;
+	int color;
+} focusedwindow;
+
 int handle_xerror(Display *, XErrorEvent *);
+
+static int initialise();
 static void handle_button_press(XButtonEvent *);
 static void handle_button_release(XButtonEvent *);
 static void handle_key_press(XKeyEvent *);
 static void handle_window_creation(XCreateWindowEvent *);
 static void handle_window_destruction(XDestroyWindowEvent *);
 static void handle_motion(XMotionEvent *);
+static void handle_window_map(XMapEvent *);
 
-//borrowed from aewm
+
+static Display * dpy;
+static XWindowAttributes attr;
+static XButtonEvent pointerorigin;
+
+static int colortracker[NUMCOLORS];
+static WindowNode windowlist[NUMCOLORS];
+static int focusedcolor = 0;
+//static Window focusedwindow; //XGetInputFocus exists, but 
+
+
 void spawn_terminal() {
 	pid_t pid = fork();
 	if (pid == 0) {
@@ -54,13 +69,15 @@ void spawn_terminal() {
 	}
 }
 
-static Display * dpy;
-static XWindowAttributes attr;
-static XButtonEvent pointerorigin;
-
-static int colortracker[NUMCOLORS];
-static WindowNode windowlist[NUMCOLORS];
-
+void shell_command(char * command) {
+	pid_t pid = fork();
+	if (pid == 0) {
+		setsid();
+		printf("%s", command);
+		execlp("/bin/sh", "sh", "-C", command, NULL);
+		exit(1);
+	}
+}
 
 int main(void) {
     XEvent ev;
@@ -72,11 +89,6 @@ int main(void) {
 
     for(;;)
     {
-
-        /* this is the most basic way of looping through X events; you can be
-         * more flexible by using XPending(), or ConnectionNumber() along with
-         * select() (or poll() or whatever floats your boat).
-         */
 
         XNextEvent(dpy, &ev);
 
@@ -90,6 +102,8 @@ int main(void) {
 				handle_key_press(&ev.xkey); break;
 			case CreateNotify:
 				handle_window_creation(&ev.xcreatewindow); break;
+			case MapNotify:
+				handle_window_map(&ev.xmap); break;
 			case DestroyNotify:
 				handle_window_destruction(&ev.xdestroywindow); break;
 			case MotionNotify:
@@ -107,18 +121,25 @@ static void handle_button_press(XButtonEvent *e) {
 		XGetWindowAttributes(dpy, e->subwindow, &attr);
 		pointerorigin = *e;
 	}
-		/* we "remember" the position of the pointer at the beginning of
-		 * our move/resize, and the size/position of the window.  that way,
-		 * when the pointer moves, we can compare it to our initial data
-		 * and move/resize accordingly.
-		 */
-		//XGetWindowAttributes(dpy, ev.xbutton.subwindow, &attr);
-		//start = ev.xbutton;
 }
 
 static void handle_button_release(XButtonEvent *e) {
 	pointerorigin.subwindow = None;
-	//start.subwindow = None;
+}
+
+int color_to_pixel_value(int color) {
+	switch (color) {
+		case 0:
+			//return 25600; //equivalent to (0,100,0)
+			return 11169350; //equivalent to (170, 110, 70)
+		case 1:
+			return 5208386;
+		case 2: 
+			return 16494290; 
+		case 3:
+			return 4014460;
+	}
+	return 0;
 }
 
 
@@ -141,27 +162,50 @@ static void focus_color(int color) {
 	 * 	for 2):
 	 * 	the current focused window will not be found in the list. Focus the
 	 * 	first window in the list
+	 *
+	 * 	potential optimisation:
+	 * 	remember current border colour to skip scenario 2) completely -
+	 * 	if selecting a different colour to current, just select first in list
+	 * 	and return
 	*/
 
 	Window focusedwindow;
 	int revert_to_return;
-
 	XGetInputFocus(dpy, &focusedwindow, &revert_to_return);
 	printf("initial focused window: %lx\n", focusedwindow);
+
+	//colour focused window back to normal
+	XSetWindowBorder(dpy, focusedwindow, color_to_pixel_value(focusedcolor));
+	//as window is guarenteed to be found below, set focusedcolor to new color
+	focusedcolor = color;
 
 	wn = wn->next;
 	Window firstwindow = wn->id;
 	while (wn->next != NULL) {
+		//scenario 1)
 		if (wn->id == focusedwindow) {
 			wn = wn->next;
-			XSetInputFocus(dpy, wn->id, RevertToParent, CurrentTime);
 			XRaiseWindow(dpy, wn->id);
+			XSetInputFocus(dpy, wn->id, RevertToParent, CurrentTime);
+			XSetWindowBorder(dpy, wn->id, FOCUSCOLOR);
+
+			/* flash mode 
+			XFlush(dpy); //ensure all events processed before sleeping
+			sleep(0.7*1000);
+			XSetWindowBorder(dpy, wn->id, color_to_pixel_value(color)); */
 			return;
 		}
 		wn = wn->next;
 	}
+
+	//scenario 2)
+	XRaiseWindow(dpy, firstwindow);
 	XSetInputFocus(dpy, firstwindow, RevertToParent, CurrentTime);
-	XRaiseWindow(dpy, wn->id);
+	XSetWindowBorder(dpy, firstwindow, FOCUSCOLOR);
+	/* flash mode
+	XFlush(dpy); //ensure all events processed before sleeping
+	sleep(0.7*1000);
+	XSetWindowBorder(dpy, firstwindow, color_to_pixel_value(color)); */
 }
 
 
@@ -169,7 +213,22 @@ static void destroy_active_window() {
 	Window focusedwindow;
 	int revert_to_return;
 	XGetInputFocus(dpy, &focusedwindow, &revert_to_return);
-	XDestroyWindow(dpy, focusedwindow);
+	//XKillClient(dpy, focusedwindow);
+	//XDestroyWindow(dpy, focusedwindow);
+
+	XEvent ev;
+	 
+	//memset(&ev, 0, sizeof (ev));
+	 
+	//assumes ICCCM compliance
+	//from: https://nachtimwald.com/2009/11/08/sending-wm_delete_window-client-messages/
+	ev.xclient.type = ClientMessage;
+	ev.xclient.window = focusedwindow;
+	ev.xclient.message_type = XInternAtom(dpy, "WM_PROTOCOLS", True);
+	ev.xclient.format = 32;
+	ev.xclient.data.l[0] = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
+	ev.xclient.data.l[1] = CurrentTime;
+	XSendEvent(dpy, focusedwindow, False, NoEventMask, &ev);	
 }
 
 
@@ -178,7 +237,10 @@ static void handle_key_press(XKeyEvent *e) {
 	//if(ev.xkey.subwindow != None) { 
 	switch(e->keycode) {
 		case 36: // enter
-			spawn_terminal(); break;
+			//spawn_terminal(); 
+			//system("xterm");
+			shell_command("xterm");
+			break;
 		case 38: // "a"
 			printf("a\n");
 			focus_color(0);
@@ -198,6 +260,22 @@ static void handle_key_press(XKeyEvent *e) {
 		case 24: // "q"
 			printf("q\n");
 			destroy_active_window();
+			break;
+		case 52: // "z"
+			printf("z");
+			//system("mpc toggle");
+			shell_command("mpc\ toggle");
+			break;
+		case 53: // "x"
+			printf("x\n");
+			//shell_command("mpc next");
+			shell_command("qutebrowser");
+			//system("qutebrowser");
+			break;
+		case 54: // "c"
+			printf("c\n");
+			shell_command("~/bin/nextalbum");
+			break;
 	}
 
 	/*if(e->window != None) { 
@@ -219,20 +297,7 @@ static void handle_key_press(XKeyEvent *e) {
 }
 
 //give the window a border and border colour
-int color_to_pixel_value(int color) {
-	switch (color) {
-		case 0:
-			//return 25600; //equivalent to (0,100,0)
-			return 11169350; //equivalent to (170, 110, 70)
-		case 1:
-			return 5208386;
-		case 2: 
-			return 16494290; 
-		case 3:
-			return 4014460;
-	}
-	return 0;
-}
+
 
 static void add_to_windowlist(Window w, int windowcolor) {
 	WindowNode *wn = &windowlist[windowcolor];
@@ -247,9 +312,55 @@ static void add_to_windowlist(Window w, int windowcolor) {
 	wn->next = newnode;
 }
 
-static void handle_window_creation(XCreateWindowEvent *e) {
+
+static void handle_window_map(XMapEvent *e) {
 	
 	//find rarest color
+	int minvalue = colortracker[0];
+	int mincolor = 0;
+	for (int i=1; i<NUMCOLORS; i++) {
+		if (colortracker[i] < minvalue) {
+			minvalue = colortracker[i];
+			mincolor = i;
+		}
+	}
+	//printf("adding window: %lx, address: %lx\n", e->window, &e->window);
+
+
+	//update tracker
+	colortracker[mincolor] = colortracker[mincolor] + 1;
+
+	//add window to relevant linked list
+	printf("created window id: %lx\n", e->window);
+	add_to_windowlist(e->window, mincolor);
+
+	XSetWindowBorderWidth(e->display, e->window, 10);
+	//XSetWindowBorder(e->display, e->window, color_to_pixel_value(mincolor));
+
+	//focus new window, setting border of old focus back to regular color
+	Window focusedwindow;
+	int revert_to_return;
+	XGetInputFocus(dpy, &focusedwindow, &revert_to_return);
+	printf("old focused window id: %lx\n", focusedwindow);
+	XSetWindowBorder(dpy, focusedwindow, color_to_pixel_value(focusedcolor));
+
+	XSetInputFocus(dpy, e->window, RevertToParent, CurrentTime);
+	XSetWindowBorder(dpy, e->window, FOCUSCOLOR);
+	XRaiseWindow(dpy, e->window);
+
+	/* Flash mode
+	 XFlush(dpy); //ensure all events processed before sleeping
+	sleep(0.7);
+	XSetWindowBorder(dpy, e->window, color_to_pixel_value(mincolor));*/
+
+	focusedcolor = mincolor;
+}
+
+
+
+static void handle_window_creation(XCreateWindowEvent *e) {
+	
+	/*//find rarest color
 	int minvalue = colortracker[0];
 	int mincolor = 0;
 	for (int i=1; i<NUMCOLORS; i++) {
@@ -273,8 +384,10 @@ static void handle_window_creation(XCreateWindowEvent *e) {
 	XSetWindowBorder(e->display, e->window, color_to_pixel_value(mincolor));
 
 	//focus new window
-	XMapWindow(dpy, e->window);
+	//XMapWindow(dpy, e->window);
+	XRaiseWindow(dpy, e->window);
 	XSetInputFocus(dpy, e->window, RevertToParent, CurrentTime);
+	*/
 }
 
 
@@ -337,12 +450,83 @@ static void handle_motion(XMotionEvent *e) {
 	}
 }
 
+/* it is in situations such as this that a structure such as a hashmap would
+ * have been much superior to an array of linkedlists, being O(1) rather than
+ * O(n). However, as n (being the number of windows) is never significantly
+ * large (>1000), the performance boost gained by reimplenting the whole window
+ * manager with e.g. a hash map is minimal compared to the developer time taken to 
+ * refactor */
+static int window_exists(Window w) {
+	WindowNode *wn;
+
+	for (int i=0; i<NUMCOLORS; i++) {
+		wn = &windowlist[i];
+
+		//if list empty, go to next list 
+		if (wn->next == NULL) {
+			continue;
+		}
+
+		while (wn->next != NULL) {
+
+			if (wn->next->id == w) {
+				return 1;
+			}
+			wn = wn->next;
+		}
+	}
+	return 0;
+}
+
+/* cycle through windowlists until a window is found
+ * the window_exists is needed as some programs create invisible windows then delete them
+ * resulting in a window of color 0 being selected, messing up handle_map,
+ * which attempts to colour the previously selected window back to its
+ * original colour when a new window is mapped
+*/
+
+static void focus_new_window() {
+	WindowNode *wn;
+	for (int i=0; i<NUMCOLORS; i++) {
+		wn = &windowlist[i];
+		if (wn->next != NULL) {
+			wn = wn->next;
+			XRaiseWindow(dpy, wn->id);
+			XSetInputFocus(dpy, wn->id, RevertToParent, CurrentTime);
+			XSetWindowBorder(dpy, wn->id, FOCUSCOLOR);
+			focusedcolor = i;
+			return;
+		}
+	}
+}
+
 //removes deleted window from linkedlist and colortracker
 static void handle_window_destruction(XDestroyWindowEvent *e) {
-	//TODO: fix the "not checking last node" problem properly
 	printf("destruction window id: %lx\n", e->window);
 
-	int bordercolor = -1;
+	/* CURRENT: if the window had been mapped, a new window needs to be selected
+	 * DESIRED: if the window was the focused window when it was destroyed, a
+	 * new window needs to be selected 
+	 * behaviour between CURRENT and DESIRED is mostly the same as most of the
+	 * time when a window is killed it is also the current focused (killed by
+	 * the program finishing/ user pressing mod+q)
+	 * however, CURRENT changes the focus when kill/pkill/xkill is used, which
+	 * is an unintended behaviour */
+	//this shouldn't work - most of the time, the focused window is the window
+	//being killed
+	if (window_exists(e->window)) {
+		 Window focusedwindow;
+		int revert_to_return;
+		XGetInputFocus(dpy, &focusedwindow, &revert_to_return);
+		printf("old focused window id: %lx\n", focusedwindow);
+		/*if (focusedwindow == ROOTID) {
+			printf("YASSS");
+		}*/
+		//XSetWindowBorder(dpy, focusedwindow, color_to_pixel_value(focusedcolor));
+		focus_new_window();
+	}
+
+
 	int windowfound = 0;
 	WindowNode *wn;
 
@@ -358,7 +542,6 @@ static void handle_window_destruction(XDestroyWindowEvent *e) {
 		while (wn->next != NULL) {
 			if (wn->next->id == e->window) {
 				WindowNode *wntofree = wn->next;
-				bordercolor = i;
 				windowfound = 1;
 				/*if the node to delete has a next node, set current next to
 				that node, else node to delete is last in list so can set current
@@ -369,14 +552,13 @@ static void handle_window_destruction(XDestroyWindowEvent *e) {
 					wn->next = NULL;
 				}
 				free(wntofree);
+				//remove window from colortracker
+				colortracker[i] = colortracker[i] - 1;
 				break;
 			}
 			wn = wn->next;
 		}
 	}
-
-	//remove window from colortracker
-	colortracker[bordercolor] = colortracker[bordercolor] - 1;
 }
 
 
@@ -444,6 +626,12 @@ static int initialise() {
             DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
     XGrabKey(dpy, XKeysymToKeycode(dpy, XStringToKeysym("q")), Mod1Mask,
             DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XStringToKeysym("z")), Mod1Mask,
+            DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XStringToKeysym("x")), Mod1Mask,
+            DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XStringToKeysym("c")), Mod1Mask,
+            DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
 
 
 
@@ -469,24 +657,8 @@ static int initialise() {
 /* --- UTILS --- */
 
 int handle_xerror(Display *dpy, XErrorEvent *e) {
+	printf("???\n");
 	return 0;
 }
 
-//future TODO ggVGs/Mod1Mask/Mod1Mask/g
-//OLD DESTRUCTION CODE
-//
-/*		while (wn->next != NULL) {
-			if (wn->id == e->window) {
-				bordercolor = i;
-				//printf("window to delete found, bordercolor: %d\n", bordercolor);
-				windowfound = 1;
-			}
-			wn = wn->next;
-		}
-		//check last node in list -- ugly, but works
-		if (wn->id == e->window) {
-			bordercolor = i;
-			//printf("window to delete found here, bordercolor: %d\n", bordercolor);
-			windowfound = 1;
-		}
-*/
+//future TODO: replace Mod1Mask (alt) with Mod4Mask (meta)
