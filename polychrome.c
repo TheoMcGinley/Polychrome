@@ -1,6 +1,7 @@
-//TODO consider adding a variable for focusedwindow - easier to keep track of
-//logical focus
-//TODO fix improper colouring if pkill used 
+//done:
+//refactored common patterns; added a focused window tracker; removed
+//handle_creation
+
 //TODO fix shell_command (doesn't like some commands e.g. spaces)
 //TODO proper error handling 
 /*TODO force close if WM_DELETE_WINDOW doesn't go through
@@ -24,6 +25,8 @@
 #define NUMBUCKETS 20
 #define FOCUSCOLOR 16777111 //soft yellow
 				 //16777215 // white
+#define NOID -1
+#define NOCOLOR -1
 
 struct WindowNode {
 	Window id;
@@ -32,11 +35,11 @@ struct WindowNode {
 struct WindowNode;
 typedef struct WindowNode WindowNode;
 
-//Polychrome Window
+//Polychrome Window - a better alternative than XGetInputFocus
 struct PWindow {
 	Window id;
 	int color;
-} focusedwindow;
+} focused;
 
 int handle_xerror(Display *, XErrorEvent *);
 
@@ -44,7 +47,6 @@ static int initialise();
 static void handle_button_press(XButtonEvent *);
 static void handle_button_release(XButtonEvent *);
 static void handle_key_press(XKeyEvent *);
-static void handle_window_creation(XCreateWindowEvent *);
 static void handle_window_destruction(XDestroyWindowEvent *);
 static void handle_motion(XMotionEvent *);
 static void handle_window_map(XMapEvent *);
@@ -56,8 +58,6 @@ static XButtonEvent pointerorigin;
 
 static int colortracker[NUMCOLORS];
 static WindowNode windowlist[NUMCOLORS];
-static int focusedcolor = 0;
-//static Window focusedwindow; //XGetInputFocus exists, but 
 
 
 void spawn_terminal() {
@@ -100,8 +100,6 @@ int main(void) {
                 handle_button_release(&ev.xbutton); break;
 			case KeyPress:
 				handle_key_press(&ev.xkey); break;
-			case CreateNotify:
-				handle_window_creation(&ev.xcreatewindow); break;
 			case MapNotify:
 				handle_window_map(&ev.xmap); break;
 			case DestroyNotify:
@@ -142,6 +140,17 @@ int color_to_pixel_value(int color) {
 	return 0;
 }
 
+static void reset_focused_border(){
+	XSetWindowBorder(dpy, focused.id, color_to_pixel_value(focused.color));
+}
+
+static void focus_window(Window w, int color) {
+	XRaiseWindow(dpy, w);
+	XSetInputFocus(dpy, w, RevertToParent, CurrentTime);
+	XSetWindowBorder(dpy, w, FOCUSCOLOR);
+	focused.id = w;
+	focused.color = color;
+}
 
 static void focus_color(int color) {
 
@@ -169,53 +178,26 @@ static void focus_color(int color) {
 	 * 	and return
 	*/
 
-	Window focusedwindow;
-	int revert_to_return;
-	XGetInputFocus(dpy, &focusedwindow, &revert_to_return);
-	printf("initial focused window: %lx\n", focusedwindow);
-
-	//colour focused window back to normal
-	XSetWindowBorder(dpy, focusedwindow, color_to_pixel_value(focusedcolor));
-	//as window is guarenteed to be found below, set focusedcolor to new color
-	focusedcolor = color;
+	reset_focused_border();
 
 	wn = wn->next;
 	Window firstwindow = wn->id;
 	while (wn->next != NULL) {
 		//scenario 1)
-		if (wn->id == focusedwindow) {
+		if (wn->id == focused.id) {
 			wn = wn->next;
-			XRaiseWindow(dpy, wn->id);
-			XSetInputFocus(dpy, wn->id, RevertToParent, CurrentTime);
-			XSetWindowBorder(dpy, wn->id, FOCUSCOLOR);
-
-			/* flash mode 
-			XFlush(dpy); //ensure all events processed before sleeping
-			sleep(0.7*1000);
-			XSetWindowBorder(dpy, wn->id, color_to_pixel_value(color)); */
+			focus_window(wn->id, color);
 			return;
 		}
 		wn = wn->next;
 	}
 
 	//scenario 2)
-	XRaiseWindow(dpy, firstwindow);
-	XSetInputFocus(dpy, firstwindow, RevertToParent, CurrentTime);
-	XSetWindowBorder(dpy, firstwindow, FOCUSCOLOR);
-	/* flash mode
-	XFlush(dpy); //ensure all events processed before sleeping
-	sleep(0.7*1000);
-	XSetWindowBorder(dpy, firstwindow, color_to_pixel_value(color)); */
+	focus_window(firstwindow, color);
 }
 
 
 static void destroy_active_window() {
-	Window focusedwindow;
-	int revert_to_return;
-	XGetInputFocus(dpy, &focusedwindow, &revert_to_return);
-	//XKillClient(dpy, focusedwindow);
-	//XDestroyWindow(dpy, focusedwindow);
-
 	XEvent ev;
 	 
 	//memset(&ev, 0, sizeof (ev));
@@ -223,12 +205,12 @@ static void destroy_active_window() {
 	//assumes ICCCM compliance
 	//from: https://nachtimwald.com/2009/11/08/sending-wm_delete_window-client-messages/
 	ev.xclient.type = ClientMessage;
-	ev.xclient.window = focusedwindow;
+	ev.xclient.window = focused.id;
 	ev.xclient.message_type = XInternAtom(dpy, "WM_PROTOCOLS", True);
 	ev.xclient.format = 32;
 	ev.xclient.data.l[0] = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
 	ev.xclient.data.l[1] = CurrentTime;
-	XSendEvent(dpy, focusedwindow, False, NoEventMask, &ev);	
+	XSendEvent(dpy, focused.id, False, NoEventMask, &ev);	
 }
 
 
@@ -277,28 +259,9 @@ static void handle_key_press(XKeyEvent *e) {
 			shell_command("~/bin/nextalbum");
 			break;
 	}
-
-	/*if(e->window != None) { 
-		spawn_terminal();
-	}*/
-
-        /* this is our keybinding for raising windows.  as i saw someone
-         * mention on the ratpoison wiki, it is pretty stupid; however, i
-         * wanted to fit some sort of keyboard binding in here somewhere, and
-         * this was the best fit for it.
-         *
-         * i was a little confused about .window vs. .subwindow for a while,
-         * but a little RTFMing took care of that.  our passive grabs above
-         * grabbed on the root window, so since we're only interested in events
-         * for its child windows, we look at .subwindow.  when subwindow ==
-         * None, that means that the window the event happened in was the same
-         * window that was grabbed on -- in this case, the root window.
-         */
 }
 
 //give the window a border and border colour
-
-
 static void add_to_windowlist(Window w, int windowcolor) {
 	WindowNode *wn = &windowlist[windowcolor];
 	while (wn->next != NULL) {
@@ -315,7 +278,8 @@ static void add_to_windowlist(Window w, int windowcolor) {
 
 static void handle_window_map(XMapEvent *e) {
 	
-	//find rarest color
+	//find rarest color and update tracker
+	printf("mapping, part 1\n");
 	int minvalue = colortracker[0];
 	int mincolor = 0;
 	for (int i=1; i<NUMCOLORS; i++) {
@@ -324,119 +288,68 @@ static void handle_window_map(XMapEvent *e) {
 			mincolor = i;
 		}
 	}
-	//printf("adding window: %lx, address: %lx\n", e->window, &e->window);
 
-
-	//update tracker
 	colortracker[mincolor] = colortracker[mincolor] + 1;
 
 	//add window to relevant linked list
-	printf("created window id: %lx\n", e->window);
 	add_to_windowlist(e->window, mincolor);
 
+	sleep(1);
+	printf("mapping, part 2\n");
 	XSetWindowBorderWidth(e->display, e->window, 10);
 	//XSetWindowBorder(e->display, e->window, color_to_pixel_value(mincolor));
 
 	//focus new window, setting border of old focus back to regular color
-	Window focusedwindow;
-	int revert_to_return;
-	XGetInputFocus(dpy, &focusedwindow, &revert_to_return);
-	printf("old focused window id: %lx\n", focusedwindow);
-	XSetWindowBorder(dpy, focusedwindow, color_to_pixel_value(focusedcolor));
-
-	XSetInputFocus(dpy, e->window, RevertToParent, CurrentTime);
-	XSetWindowBorder(dpy, e->window, FOCUSCOLOR);
-	XRaiseWindow(dpy, e->window);
-
-	/* Flash mode
-	 XFlush(dpy); //ensure all events processed before sleeping
-	sleep(0.7);
-	XSetWindowBorder(dpy, e->window, color_to_pixel_value(mincolor));*/
-
-	focusedcolor = mincolor;
-}
-
-
-
-static void handle_window_creation(XCreateWindowEvent *e) {
-	
-	/*//find rarest color
-	int minvalue = colortracker[0];
-	int mincolor = 0;
-	for (int i=1; i<NUMCOLORS; i++) {
-		if (colortracker[i] < minvalue) {
-			minvalue = colortracker[i];
-			mincolor = i;
-		}
+	if (focused.id != NOID) {
+		reset_focused_border();
 	}
-	//printf("adding window: %lx, address: %lx\n", e->window, &e->window);
 
-
-	//update tracker
-	colortracker[mincolor] = colortracker[mincolor] + 1;
-
-	//add window to relevant linked list
-	printf("created window id: %lx\n", e->window);
-	add_to_windowlist(e->window, mincolor);
-
-	//set border 
-	XSetWindowBorderWidth(e->display, e->window, 10);
-	XSetWindowBorder(e->display, e->window, color_to_pixel_value(mincolor));
-
-	//focus new window
-	//XMapWindow(dpy, e->window);
-	XRaiseWindow(dpy, e->window);
-	XSetInputFocus(dpy, e->window, RevertToParent, CurrentTime);
-	*/
+	sleep(1);
+	printf("mapping, part 3\n");
+	focus_window(e->window, mincolor);
+	sleep(1);
+	printf("mapping, part 4\n");
 }
+
 
 
 /* we only get motion events when a button is being pressed,
  * but we still have to check that the drag started on a window */
 static void handle_motion(XMotionEvent *e) {
 	/*
-	if(start.subwindow != None) {
-		* here we could "compress" motion notify events by doing:
-		 *
-		 * while(XCheckTypedEvent(dpy, MotionNotify, &ev));
-		 *
-		 * if there are 10 of them waiting, it makes no sense to look at
-		 * any of them but the most recent.  in some cases -- if the window
-		 * is really big or things are just acting slowly in general --
-		 * failing to do this can result in a lot of "drag lag," especially
-		 * if your wm does a lot of drawing and whatnot that causes it to
-		 * lag.
-		 *
-		 * for window managers with things like desktop switching, it can
-		 * also be useful to compress EnterNotify events, so that you don't
-		 * get "focus flicker" as windows shuffle around underneath the
-		 * pointer.
-		 */
+	* here we could "compress" motion notify events by doing:
+	 *
+	 * while(XCheckTypedEvent(dpy, MotionNotify, &ev));
+	 *
+	 * if there are 10 of them waiting, it makes no sense to look at
+	 * any of them but the most recent.  in some cases -- if the window
+	 * is really big or things are just acting slowly in general --
+	 * failing to do this can result in a lot of "drag lag," especially
+	 * if your wm does a lot of drawing and whatnot that causes it to
+	 * lag.
+	 *
+	 * for window managers with things like desktop switching, it can
+	 * also be useful to compress EnterNotify events, so that you don't
+	 * get "focus flicker" as windows shuffle around underneath the
+	 * pointer.
+	 */
 
-		/* now we use the stuff we saved at the beginning of the
-		 * move/resize and compare it to the pointer's current position to
-		 * determine what the window's new size or position should be.
-		 *
-		 * if the initial button press was button 1, then we're moving.
-		 * otherwise it was 3 and we're resizing.
-		 *
-		 * we also make sure not to go negative with the window's
-		 * dimensions, resulting in "wrapping" which will make our window
-		 * something ridiculous like 65000 pixels wide (often accompanied
-		 * by lots of swapping and slowdown).
-		 *
-		 * even worse is if we get "lucky" and hit a width or height of
-		 * exactly zero, triggering an X error.  so we specify a minimum
-		 * width/height of 1 pixel.
-		 *
-		int xdiff = ev.xbutton.x_root - start.x_root;
-		int ydiff = ev.xbutton.y_root - start.y_root;
-		XMoveResizeWindow(dpy, start.subwindow,
-			attr.x + (start.button==1 ? xdiff : 0),
-			attr.y + (start.button==1 ? ydiff : 0),
-			MAX(1, attr.width + (start.button==3 ? xdiff : 0)),
-			MAX(1, attr.height + (start.button==3 ? ydiff : 0)));
-	}
+	/* now we use the stuff we saved at the beginning of the
+	 * move/resize and compare it to the pointer's current position to
+	 * determine what the window's new size or position should be.
+	 *
+	 * if the initial button press was button 1, then we're moving.
+	 * otherwise it was 3 and we're resizing.
+	 *
+	 * we also make sure not to go negative with the window's
+	 * dimensions, resulting in "wrapping" which will make our window
+	 * something ridiculous like 65000 pixels wide (often accompanied
+	 * by lots of swapping and slowdown).
+	 *
+	 * even worse is if we get "lucky" and hit a width or height of
+	 * exactly zero, triggering an X error.  so we specify a minimum
+	 * width/height of 1 pixel.
+	 *
 	*/
 
 	if (pointerorigin.subwindow != None) {
@@ -491,10 +404,7 @@ static void focus_new_window() {
 		wn = &windowlist[i];
 		if (wn->next != NULL) {
 			wn = wn->next;
-			XRaiseWindow(dpy, wn->id);
-			XSetInputFocus(dpy, wn->id, RevertToParent, CurrentTime);
-			XSetWindowBorder(dpy, wn->id, FOCUSCOLOR);
-			focusedcolor = i;
+			focus_window(wn->id, i);
 			return;
 		}
 	}
@@ -504,28 +414,9 @@ static void focus_new_window() {
 static void handle_window_destruction(XDestroyWindowEvent *e) {
 	printf("destruction window id: %lx\n", e->window);
 
-	/* CURRENT: if the window had been mapped, a new window needs to be selected
-	 * DESIRED: if the window was the focused window when it was destroyed, a
-	 * new window needs to be selected 
-	 * behaviour between CURRENT and DESIRED is mostly the same as most of the
-	 * time when a window is killed it is also the current focused (killed by
-	 * the program finishing/ user pressing mod+q)
-	 * however, CURRENT changes the focus when kill/pkill/xkill is used, which
-	 * is an unintended behaviour */
-	//this shouldn't work - most of the time, the focused window is the window
-	//being killed
-	if (window_exists(e->window)) {
-		 Window focusedwindow;
-		int revert_to_return;
-		XGetInputFocus(dpy, &focusedwindow, &revert_to_return);
-		printf("old focused window id: %lx\n", focusedwindow);
-		/*if (focusedwindow == ROOTID) {
-			printf("YASSS");
-		}*/
-		//XSetWindowBorder(dpy, focusedwindow, color_to_pixel_value(focusedcolor));
+	if (e->window == focused.id) {
 		focus_new_window();
 	}
-
 
 	int windowfound = 0;
 	WindowNode *wn;
@@ -605,9 +496,12 @@ static int initialise() {
 	//initialise the linked lists and colortracker
 	for (int i=0;i<NUMCOLORS;i++) {
 		colortracker[i] = 0;
-		windowlist[i].id = -1;
+		windowlist[i].id = NOID;
 		windowlist[i].next = NULL;
 	}
+
+	focused.id = NOID;
+	focused.color = NOCOLOR;
 
 	//make all children of root give out notify events
 	XSelectInput (dpy, RootWindow(dpy, DefaultScreen(dpy)), SubstructureNotifyMask);    
