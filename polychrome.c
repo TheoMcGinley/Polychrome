@@ -1,45 +1,50 @@
-//done:
-//refactored common patterns; added a focused window tracker; removed
-//handle_creation
-
-//TODO proper error handling 
-/*TODO force close if WM_DELETE_WINDOW doesn't go through
-	see line 295 of https://github.com/i3/i3/blob/next/src/x.c */
-//TODO use hints to determine window size:
-//http://neuron-ai.tuke.sk/hudecm/Tutorials/C/special/xlib-programming/xlib-programming-2.html
-//TODO fix shell, then make keybinds for:
-	//mpc toggle
-	//mpc next
-	//nextalbum
-	//firefox
-//TODO rename .nix expressions from theowm -> polychrome
-
+//TODO add position, width and height to windownode
+//TODO include position, width and height when adding to widnownode
 #include <X11/Xlib.h>
 #include <stdio.h> //printf
 #include <unistd.h> //NULL, exit, fork, sleep
 #include <stdlib.h> //NULL, malloc, free, exit, system
 #include <paths.h>
+#include "scoring.h"
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define NUMCOLORS 4
 #define NUMBUCKETS 20
 #define FOCUSCOLOR 16777111 //soft yellow
 				 //16777215 // white
-#define NOID -1
-#define NOCOLOR -1
+#define UNDEFINED -1
+#define GRIDSIZE 16 //RESTRICTIONS: must be even, and at least 4
+//#define CELLWIDTH (WidthOfScreen()/GRIDSIZE) //TODO make these work
+//#define CELLHEIGHT (HeightOfScreen()/GRIDSIZE)
+#define CELLWIDTH 240
+#define CELLHEIGHT 135
+#define BORDERTHICKNESS 10
 
-struct WindowNode {
-	Window id;
-	struct WindowNode *next;
-};
-struct WindowNode;
-typedef struct WindowNode WindowNode;
-
+//may need a "trackedbygrid" var to indicate whether the window should be
+//tracked or not e.g. for pop-ups, steam chat etc
 //Polychrome Window - a better alternative than XGetInputFocus
 struct PWindow {
 	Window id;
 	int color;
 } focused;
+
+struct Position {
+	int x;
+	int y;
+};
+
+struct WindowNode {
+	Window id;
+	struct Position pos;
+	int width;
+	int height;
+	struct WindowNode *next;
+};
+
+struct WindowNode;
+typedef struct WindowNode WindowNode;
+
+
 
 int handle_xerror(Display *, XErrorEvent *);
 
@@ -56,21 +61,113 @@ static Display * dpy;
 static XWindowAttributes attr;
 static XButtonEvent pointerorigin;
 
+//group these three as a struct desktopstate ?
 static int colortracker[NUMCOLORS];
 static WindowNode windowlist[NUMCOLORS];
+static int grid[GRIDSIZE][GRIDSIZE];
 
+static int nextsize;
+static int nextorientation;
 
-void spawn_terminal() {
-	pid_t pid = fork();
-	if (pid == 0) {
-		setsid();
-		execlp("/bin/sh", "sh", "-C", "xterm", NULL);
-		exit(1);
+/*
+//optionally give it a grid?
+int calc_blocking_score(int gridx, int gridy, int windowwidth, int windowheight) {
+	int score = 0;
+	//for each cell
+	for (int i=0; i<GRIDSIZE; i++) {
+		for (int j=0; j<GRIDSIZE; j++) {
+			//2 checks:
+			// 	1) i is between (inclusive) gridx and (gridx+windowwidth)
+			// 	2) j is between (inclusive gridy and (gridy+windowheight)
+			//TODO check edge conditions here
+			if ( i >= gridx && i < (gridx+windowwidth) && 
+			  	 j >= gridy && j < (gridy+windowheight)) {
+					score += (grid[i][j])*1000;
+			}
+		}
 	}
+	return score;
 }
 
-void start_app(const char *command) {
+//assuming GRIDSIZE=16
+//assert(15, 15, 1, 1) = 0
+//assert(16, 16, 1, 1) = 4000
+int calc_offscreen_score(int gridx, int gridy, int windowwidth, int windowheight) {
+	int score = 0;
+	if ((gridx + windowwidth) > GRIDSIZE) {
+		score += windowheight*4000;
+	}
+	if ((gridy + windowheight) > GRIDSIZE) {
+		score += windowwidth*4000;
+	}
+	return score;
+}
 
+int calc_positional_score(int gridx, int gridy) {
+	int x = (GRIDSIZE/2) - 1;
+	int y = (GRIDSIZE/2) - 1;
+	int direction = 0;
+	int chainsize = 1;
+	int score = 0;
+
+	//SPIRAL MAGIC
+	for (int k=1; k<=(GRIDSIZE-1); k++) {
+        for (int j=0; j<(k<(GRIDSIZE-1)?2:3); j++) {
+            for (int i=0; i<chainsize; i++) {
+				if (x==gridx && y==gridy) {
+					return score;
+				} else {
+					score += 1;
+				}
+				//do thing on [x][y]
+
+                switch (direction) {
+                    case 0: y = y + 1; break;
+                    case 1: x = x + 1; break;
+                    case 2: y = y - 1; break;
+                    case 3: x = x - 1; break;
+                }
+            }
+            direction = (direction+1)%4;
+        }
+        chainsize += 1;
+    }
+	//should never reach here
+	return score;
+}
+
+//windowwidth, windowheight uses cells as its unit
+int calculate_score(int gridx, int gridy, int windowwidth, int windowheight) {
+	return calc_offscreen_score(gridx, gridy, windowwidth, windowheight) + 
+	       calc_blocking_score(gridx, gridy, windowwidth, windowheight) +
+	       calc_positional_score(gridx, gridy);
+}
+*/
+
+struct Position find_best_position (int windowwidth, int windowheight) {
+
+	struct Position bestposition;
+	double bestscore, tmpscore;
+	//bestscore = tmpscore = calculate_score(0, 0, windowwidth, windowheight);
+	bestscore = tmpscore = calculate_score(grid, 0, 0, windowwidth, windowheight);
+
+	for (int i=0; i<GRIDSIZE; i++) {
+		for (int k=0; k<GRIDSIZE; k++) {
+			//tmpscore = calculate_score(i, k, windowwidth, windowheight);
+			tmpscore = calculate_score(grid, i, k, windowwidth, windowheight);
+			if (tmpscore < bestscore) {
+				bestscore = tmpscore;
+				bestposition.x = i;
+				bestposition.y = k;
+			}
+		}
+	}
+	printf("bestscore: %f\n", bestscore);
+	return bestposition;
+}
+
+
+void start_app(const char *command) {
 	if (fork() == 0) {
 		execl(_PATH_BSHELL, _PATH_BSHELL, "-c", command, NULL);
 	}
@@ -264,7 +361,7 @@ static void handle_key_press(XKeyEvent *e) {
 }
 
 //give the window a border and border colour
-static void add_to_windowlist(Window w, int windowcolor) {
+static void add_to_windowlist(Window w, struct Position wpos, int wwidth, int wheight, int windowcolor) {
 	WindowNode *wn = &windowlist[windowcolor];
 	while (wn->next != NULL) {
 		wn = wn->next;
@@ -272,6 +369,9 @@ static void add_to_windowlist(Window w, int windowcolor) {
 
 	WindowNode *newnode = malloc(sizeof(*newnode));
 	newnode->id = w;
+	newnode->pos = wpos;
+	newnode->width = wwidth;
+	newnode->height = wheight;
 	newnode->next = NULL;
 	wn->next = newnode;
 }
@@ -291,15 +391,46 @@ static void handle_window_map(XMapEvent *e) {
 
 	colortracker[mincolor] = colortracker[mincolor] + 1;
 
-	//add window to relevant linked list
-	add_to_windowlist(e->window, mincolor);
-
-	XSetWindowBorderWidth(e->display, e->window, 10);
+	XSetWindowBorderWidth(e->display, e->window, BORDERTHICKNESS);
 
 	//focus new window, setting border of old focus back to regular color
-	if (focused.id != NOID) {
+	if (focused.id != UNDEFINED) {
 		reset_focused_border();
 	}
+
+	//TODO accept givenwidth, givenheight as input from user
+	int givenwidth = 4;
+	int givenheight = 4;
+	struct Position pos = find_best_position(givenwidth, givenheight);
+	XMoveResizeWindow(dpy, e->window, (pos.x*CELLWIDTH)+BORDERTHICKNESS,
+			(pos.y*CELLHEIGHT)+BORDERTHICKNESS, (givenwidth*CELLWIDTH)-(2*BORDERTHICKNESS),
+			(givenheight*CELLHEIGHT)-(2*BORDERTHICKNESS));
+	//printf("x: %d, y: %d\n", pos.x*CELLWIDTH, pos.y*CELLHEIGHT);
+	printf("x: %d, y: %d\n", pos.x, pos.y);
+
+	//populate_grid
+	for (int i=0; i<GRIDSIZE; i++) {
+		for (int j=0; j<GRIDSIZE; j++) {
+			if ( i >= pos.x && i < (pos.x+givenheight) && 
+			  	 j >= pos.y && j < (pos.y+givenheight)) {
+					grid[i][j] += 1;
+			}
+		}
+	}
+
+	//add window to relevant linked list
+	add_to_windowlist(e->window, pos, givenwidth, givenheight, mincolor);
+
+
+
+	//print grid
+	for (int i=0; i<16; i++) {
+		for (int j=0; j<16; j++) {
+			printf("%d ", grid[i][j]);
+		}
+		printf("\n");
+	}
+
 
 	focus_window(e->window, mincolor);
 }
@@ -413,6 +544,7 @@ static void handle_window_destruction(XDestroyWindowEvent *e) {
 
 	int windowfound = 0;
 	WindowNode *wn;
+	WindowNode *wntofree = NULL;
 
 	//find and remove window from linked lists
 	for (int i=0; i<NUMCOLORS && !windowfound; i++) {
@@ -425,7 +557,7 @@ static void handle_window_destruction(XDestroyWindowEvent *e) {
 
 		while (wn->next != NULL) {
 			if (wn->next->id == e->window) {
-				WindowNode *wntofree = wn->next;
+				wntofree = wn->next;
 				windowfound = 1;
 				/*if the node to delete has a next node, set current next to
 				that node, else node to delete is last in list so can set current
@@ -435,7 +567,6 @@ static void handle_window_destruction(XDestroyWindowEvent *e) {
 				} else {
 					wn->next = NULL;
 				}
-				free(wntofree);
 				//remove window from colortracker
 				colortracker[i] = colortracker[i] - 1;
 				break;
@@ -443,64 +574,59 @@ static void handle_window_destruction(XDestroyWindowEvent *e) {
 			wn = wn->next;
 		}
 	}
+
+	if (wntofree != NULL) {
+
+		for (int i=0; i<GRIDSIZE; i++) {
+			for (int j=0; j<GRIDSIZE; j++) {
+				if ( i >= wntofree->pos.x && i < (wntofree->pos.x + wntofree->width) && 
+					 j >= wntofree->pos.y && j < (wntofree->pos.y + wntofree->height)) {
+						grid[i][j] -= 1;
+				}
+			}
+		}
+		free(wntofree);
+	}
 }
 
 
 
 static int initialise() {
 
-    /* we use DefaultRootWindow to get the root window, which is a somewhat
-     * naive approach that will only work on the default screen.  most people
-     * only have one screen, but not everyone.  if you run multi-head without
-     * xinerama then you quite possibly have multiple screens. (i'm not sure
-     * about vendor-specific implementations, like nvidia's)
-     *
-     * many, probably most window managers only handle one screen, so in
-     * reality this isn't really *that* naive.
-     *
-     * if you wanted to get the root window of a specific screen you'd use
-     * RootWindow(), but the user can also control which screen is our default:
-     * if they set $DISPLAY to ":0.foo", then our default screen number is
-     * whatever they specify "foo" as.
-     */
-
-    /* you could also include keysym.h and use the XK_F1 constant instead of
-     * the call to XStringToKeysym, but this method is more "dynamic."  imagine
-     * you have config files which specify key bindings.  instead of parsing
-     * the key names and having a huge table or whatever to map strings to XK_*
-     * constants, you can just take the user-specified string and hand it off
-     * to XStringToKeysym.  XStringToKeysym will give you back the appropriate
-     * keysym or tell you if it's an invalid key name.
-     *
-     * a keysym is basically a platform-independent numeric representation of a
-     * key, like "F1", "a", "b", "L", "5", "Shift", etc.  a keycode is a
-     * numeric representation of a key on the keyboard sent by the keyboard
-     * driver (or something along those lines -- i'm no hardware/driver expert)
-     * to X.  so we never want to hard-code keycodes, because they can and will
-     * differ between systems.
-     */
-
     if(!(dpy = XOpenDisplay(0x0))) {
 		return 0;
 	}
+
+	start_app("feh --bg-tile -z /home/theo/pix/backgrounds/tiling/");
 
 	//XSetErrorHandler(handle_xerror);
 
 	//initialise the linked lists and colortracker
 	for (int i=0;i<NUMCOLORS;i++) {
 		colortracker[i] = 0;
-		windowlist[i].id = NOID;
+		windowlist[i].id = UNDEFINED;
 		windowlist[i].next = NULL;
 	}
 
-	focused.id = NOID;
-	focused.color = NOCOLOR;
+	for (int i=0; i<GRIDSIZE; i++) {
+		for (int j=0; j<GRIDSIZE; j++) {
+			grid[i][j] = 0;
+		}
+	}
+
+	focused.id = UNDEFINED;
+	focused.color = UNDEFINED;
 
 	//make all children of root give out notify events
 	XSelectInput (dpy, RootWindow(dpy, DefaultScreen(dpy)), SubstructureNotifyMask);    
 	XSetInputFocus(dpy, RootWindow(dpy, DefaultScreen(dpy)), RevertToNone, CurrentTime);
 
 	//grab keys needed for the wm
+    XGrabButton(dpy, 1, Mod1Mask, DefaultRootWindow(dpy), True,
+            ButtonPressMask|ButtonReleaseMask|PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None);
+    XGrabButton(dpy, 3, Mod1Mask, DefaultRootWindow(dpy), True,
+            ButtonPressMask|ButtonReleaseMask|PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None);
+
     XGrabKey(dpy, XKeysymToKeycode(dpy, XStringToKeysym("Return")), Mod1Mask,
             DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
     XGrabKey(dpy, XKeysymToKeycode(dpy, XStringToKeysym("a")), Mod1Mask,
@@ -519,23 +645,12 @@ static int initialise() {
             DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
     XGrabKey(dpy, XKeysymToKeycode(dpy, XStringToKeysym("c")), Mod1Mask,
             DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
-
-
-
-
-
-    /* XGrabKey and XGrabButton are basically ways of saying "when this
-     * combination of modifiers and key/button is pressed, send me the events."
-     * so we can safely assume that we'll receive Alt+F1 events, Alt+Button1
-     * events, and Alt+Button3 events, but no others.  You can either do
-     * individual grabs like these for key/mouse combinations, or you can use
-     * XSelectInput with KeyPressMask/ButtonPressMask/etc to catch all events
-     * of those types and filter them as you receive them.
-     */
-    XGrabButton(dpy, 1, Mod1Mask, DefaultRootWindow(dpy), True,
-            ButtonPressMask|ButtonReleaseMask|PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None);
-    XGrabButton(dpy, 3, Mod1Mask, DefaultRootWindow(dpy), True,
-            ButtonPressMask|ButtonReleaseMask|PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XStringToKeysym("b")), Mod1Mask,
+            DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XStringToKeysym("r")), Mod1Mask,
+            DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XStringToKeysym("p")), Mod1Mask,
+            DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
 
     pointerorigin.subwindow = None;
 	return 1;
