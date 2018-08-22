@@ -1,5 +1,5 @@
-#include "scoring.h"
-#define GRIDSIZE 16
+#include "polychrome.h"
+
 //optionally give it a grid?
 static double calc_blocking_score(int grid[GRIDSIZE][GRIDSIZE], int gridx, int gridy, int windowwidth, int windowheight) {
 	double score = 0;
@@ -33,7 +33,7 @@ static double calc_offscreen_score(int gridx, int gridy, int windowwidth, int wi
 	return score;
 }
 
-double calc_positional_score(int gridx, int gridy) {
+static double calc_positional_score(int gridx, int gridy) {
 	int x = (GRIDSIZE/2) - 1;
 	int y = (GRIDSIZE/2) - 1;
 	int direction = 0;
@@ -71,6 +71,28 @@ double calculate_score(int grid[GRIDSIZE][GRIDSIZE], int gridx, int gridy, int w
 	return calc_offscreen_score(gridx, gridy, windowwidth, windowheight) + 
 	       calc_blocking_score(grid, gridx, gridy, windowwidth, windowheight) +
 	       calc_positional_score(gridx, gridy);
+}
+
+struct Position find_best_position (int windowwidth, int windowheight) {
+
+	struct Position bestposition;
+	double bestscore, tmpscore;
+	//bestscore = tmpscore = calculate_score(0, 0, windowwidth, windowheight);
+	bestscore = tmpscore = calculate_score(grid, 0, 0, windowwidth, windowheight);
+
+	for (int i=0; i<GRIDSIZE; i++) {
+		for (int k=0; k<GRIDSIZE; k++) {
+			//tmpscore = calculate_score(i, k, windowwidth, windowheight);
+			tmpscore = calculate_score(grid, i, k, windowwidth, windowheight);
+			if (tmpscore < bestscore) {
+				bestscore = tmpscore;
+				bestposition.x = i;
+				bestposition.y = k;
+			}
+		}
+	}
+	printf("bestscore: %f\n", bestscore);
+	return bestposition;
 }
 
 
