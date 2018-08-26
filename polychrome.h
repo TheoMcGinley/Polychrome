@@ -15,7 +15,8 @@
 #define FOCUSCOLOR 16777111 //soft yellow
 				 //16777215 // white
 #define UNDEFINED -1
-#define GRIDSIZE 16 //RESTRICTIONS: must be even, and at least 4
+#define GRIDWIDTH 16 
+#define GRIDHEIGHT 16 
 //#define CELLWIDTH (WidthOfScreen()/GRIDSIZE) //TODO make these work
 //#define CELLHEIGHT (HeightOfScreen()/GRIDSIZE)
 #define CELLWIDTH 240
@@ -48,6 +49,9 @@ struct WindowNode {
 struct WindowNode;
 typedef struct WindowNode WindowNode;
 
+enum SpawnConfig {REGULAR, PORTRAIT, WIDE, LARGE};
+
+
 /*
 struct workspacestate {
 	colortracker[NUMCOLORS];
@@ -60,13 +64,21 @@ struct workspacestate {
 // GLOBALS {{{
 
 extern Display * dpy;
+//extern Window root;
 extern XWindowAttributes attr;
 extern XButtonEvent pointerorigin;
 extern int colortracker[NUMCOLORS];
 extern WindowNode windowlist[NUMCOLORS];
-extern int grid[GRIDSIZE][GRIDSIZE];
+extern int grid[GRIDWIDTH][GRIDHEIGHT];
 extern int nextsize;
 extern int nextorientation;
+
+extern Atom wm_state;
+extern Atom wm_change_state;
+extern Atom wm_protos;
+extern Atom wm_delete;
+
+
 
 // END_GLOBALS }}}
 
@@ -90,7 +102,7 @@ extern int handle_xerror(Display *, XErrorEvent *);
 //scoring.c
 //extern double calculate_score(int[][], int, int, int, int);
 //extern double calculate_score(int**, int, int, int, int);
-extern double calculate_score(int[GRIDSIZE][GRIDSIZE], int, int, int, int);
+extern double calculate_score(int[GRIDWIDTH][GRIDHEIGHT], int, int, int, int);
 extern struct Position find_best_position (int, int);
 // END_FUNCTIONS }}
 #endif // POLYCHROME_H

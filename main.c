@@ -2,14 +2,22 @@
 
 
 Display * dpy;
+//Window root;
+
 XWindowAttributes attr;
 XButtonEvent pointerorigin;
 
 int colortracker[NUMCOLORS];
 WindowNode windowlist[NUMCOLORS];
-int grid[GRIDSIZE][GRIDSIZE];
-int nextsize;
-int nextorientation;
+int grid[GRIDWIDTH][GRIDHEIGHT];
+
+enum SpawnConfig nextspawn;
+
+Atom wm_state;
+Atom wm_change_state;
+Atom wm_protos;
+Atom wm_delete;
+
 
 static int initialise(void);
 
@@ -30,9 +38,18 @@ static int initialise() {
 		return 0;
 	}
 
+	//root = RootWindow(dpy, DefaultScreen(dpy));
+	//printf("ROOT: %lx\n", root);
 	//start_app("feh --bg-tile -z /home/theo/pix/backgrounds/tiling/");
 
 	//XSetErrorHandler(handle_xerror);
+
+	//ICCCM, taken from aewm
+    wm_protos = XInternAtom(dpy, "WM_PROTOCOLS", False);
+    wm_delete = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
+    wm_state = XInternAtom(dpy, "WM_STATE", False);
+    wm_change_state = XInternAtom(dpy, "WM_CHANGE_STATE", False);
+
 
 	//initialise the linked lists and colortracker
 	for (int i=0;i<NUMCOLORS;i++) {
@@ -41,8 +58,8 @@ static int initialise() {
 		windowlist[i].next = NULL;
 	}
 
-	for (int i=0; i<GRIDSIZE; i++) {
-		for (int j=0; j<GRIDSIZE; j++) {
+	for (int i=0; i<GRIDWIDTH; i++) {
+		for (int j=0; j<GRIDHEIGHT; j++) {
 			grid[i][j] = 0;
 		}
 	}

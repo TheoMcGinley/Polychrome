@@ -3,9 +3,12 @@
 static void handle_button_press(XButtonEvent *);
 static void handle_button_release(XButtonEvent *);
 static void handle_key_press(XKeyEvent *);
+static void handle_unmap_event(XUnmapEvent *);
 static void handle_window_destruction(XDestroyWindowEvent *);
 static void handle_motion(XMotionEvent *);
 static void handle_window_map(XMapEvent *);
+static void handle_client_message(XClientMessageEvent *);
+static void remove_window(Window);
 
 void event_loop() {
 	XEvent ev;
@@ -24,10 +27,19 @@ void event_loop() {
 				handle_key_press(&ev.xkey); break;
 			case MapNotify:
 				handle_window_map(&ev.xmap); break;
+            case UnmapNotify:
+                handle_unmap_event(&ev.xunmap); break;
 			case DestroyNotify:
 				handle_window_destruction(&ev.xdestroywindow); break;
 			case MotionNotify:
 				handle_motion(&ev.xmotion); break;
+            case ClientMessage:
+                handle_client_message(&ev.xclient); break;
+            case ConfigureRequest:
+                printf("ConfigureRequest received\n"); break;
+			case Expose:
+				printf("Expose received\n"); break;
+
 			default:
 				//printf("some janky event detected: %d\n", ev.type);
 				break;
@@ -45,6 +57,10 @@ static void handle_button_press(XButtonEvent *e) {
 
 static void handle_button_release(XButtonEvent *e) {
 	pointerorigin.subwindow = None;
+}
+
+static void print_status() {
+	printf("focused.id: %lx,\n", focused.id);
 }
 
 //use xev to find correct keysyms
@@ -72,7 +88,8 @@ static void handle_key_press(XKeyEvent *e) {
 			start_app("java -jar ~/vlt/RuneLite.jar");
 			break;
 		case 33: // "p"
-			start_app("scrot -u ~/pix/scrots/%Y-%m-%d-%T-screenshot.png");
+			//start_app("scrot -u ~/pix/scrots/%Y-%m-%d-%T-screenshot.png");
+			print_status();
 			break;
 		case 52: // "z"
 			start_app("mpc toggle -q");
@@ -91,6 +108,12 @@ static void handle_key_press(XKeyEvent *e) {
 
 static void handle_window_map(XMapEvent *e) {
 	
+	//don't retrack an existing window
+	if (window_exists(e->window)) {
+		//set_wm_state(e->window, NormalState)
+		return;
+	}
+
 	//find rarest color and update tracker
 	int minvalue = colortracker[0];
 	int mincolor = 0;
@@ -102,27 +125,25 @@ static void handle_window_map(XMapEvent *e) {
 	}
 
 	colortracker[mincolor] = colortracker[mincolor] + 1;
-
 	XSetWindowBorderWidth(e->display, e->window, BORDERTHICKNESS);
 
-	//focus new window, setting border of old focus back to regular color
-	if (focused.id != UNDEFINED) {
-		reset_focused_border();
-	}
+	//set border of old focus back to regular color
+	reset_focused_border();
 
-	//TODO accept givenwidth, givenheight as input from user
 	int givenwidth = 4;
 	int givenheight = 4;
+	/* find the best position for the window using the scoring system, then move
+	it there, accounting for border thickness */
 	struct Position pos = find_best_position(givenwidth, givenheight);
+
 	XMoveResizeWindow(dpy, e->window, (pos.x*CELLWIDTH)+BORDERTHICKNESS,
 			(pos.y*CELLHEIGHT)+BORDERTHICKNESS, (givenwidth*CELLWIDTH)-(2*BORDERTHICKNESS),
 			(givenheight*CELLHEIGHT)-(2*BORDERTHICKNESS));
-	//printf("x: %d, y: %d\n", pos.x*CELLWIDTH, pos.y*CELLHEIGHT);
 	printf("x: %d, y: %d\n", pos.x, pos.y);
 
 	//populate_grid
-	for (int i=0; i<GRIDSIZE; i++) {
-		for (int j=0; j<GRIDSIZE; j++) {
+	for (int i=0; i<GRIDWIDTH; i++) {
+		for (int j=0; j<GRIDHEIGHT; j++) {
 			if ( i >= pos.x && i < (pos.x+givenheight) && 
 			  	 j >= pos.y && j < (pos.y+givenheight)) {
 					grid[i][j] += 1;
@@ -133,16 +154,13 @@ static void handle_window_map(XMapEvent *e) {
 	//add window to relevant linked list
 	add_to_windowlist(e->window, pos, givenwidth, givenheight, mincolor);
 
-
-
 	//print grid
 	for (int i=0; i<16; i++) {
 		for (int j=0; j<16; j++) {
-			printf("%d ", grid[i][j]);
+			printf("%d ", grid[j][i]);
 		}
 		printf("\n");
 	}
-
 
 	focus_window(e->window, mincolor);
 }
@@ -199,9 +217,25 @@ static void handle_motion(XMotionEvent *e) {
 
 //removes deleted window from linkedlist and colortracker
 static void handle_window_destruction(XDestroyWindowEvent *e) {
-	printf("destruction window id: %lx\n", e->window);
+	if (window_exists(e->window))
+		remove_window(e->window);
+}
 
-	if (e->window == focused.id) {
+static void handle_unmap_event(XUnmapEvent *e) {
+	if (window_exists(e->window))
+		remove_window(e->window);
+}
+
+//problem: focus_new_window() focuses same window if the window to remove is
+//the first
+static void remove_window(Window win) {
+
+
+	printf("WIN: %lx\n", win);
+	/*if (win == root)
+		return;*/
+
+	if (win == focused.id) {
 		focus_new_window();
 	}
 
@@ -219,7 +253,7 @@ static void handle_window_destruction(XDestroyWindowEvent *e) {
 		}
 
 		while (wn->next != NULL) {
-			if (wn->next->id == e->window) {
+			if (wn->next->id == win) {
 				wntofree = wn->next;
 				windowfound = 1;
 				/*if the node to delete has a next node, set current next to
@@ -240,8 +274,8 @@ static void handle_window_destruction(XDestroyWindowEvent *e) {
 
 	if (wntofree != NULL) {
 
-		for (int i=0; i<GRIDSIZE; i++) {
-			for (int j=0; j<GRIDSIZE; j++) {
+		for (int i=0; i<GRIDWIDTH; i++) {
+			for (int j=0; j<GRIDHEIGHT; j++) {
 				if ( i >= wntofree->pos.x && i < (wntofree->pos.x + wntofree->width) && 
 					 j >= wntofree->pos.y && j < (wntofree->pos.y + wntofree->height)) {
 						grid[i][j] -= 1;
@@ -250,7 +284,17 @@ static void handle_window_destruction(XDestroyWindowEvent *e) {
 		}
 		free(wntofree);
 	}
+
 }
 
+// All that is required by ICCM is iconify (hide)
+static void handle_client_message(XClientMessageEvent *e)
+{
+	printf("PRETENDING TO HIDE\n");
+    /*client_t *c = find_client(e->window, MATCH_WINDOW);
+
+    if (c && e->message_type == wm_change_state &&
+        e->format == 32 && e->data.l[0] == IconicState) hide(c);*/
+}
 
 

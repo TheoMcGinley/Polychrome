@@ -1,4 +1,5 @@
 #include "polychrome.h" 
+#include <X11/Xmd.h>
 
 void start_app(const char *command) {
 	if (fork() == 0) {
@@ -22,7 +23,9 @@ int color_to_pixel_value(int color) {
 }
 
 void reset_focused_border(){
-	XSetWindowBorder(dpy, focused.id, color_to_pixel_value(focused.color));
+	//if (focused.id != UNDEFINED && focused.id != root)
+	if (focused.id != UNDEFINED)
+		XSetWindowBorder(dpy, focused.id, color_to_pixel_value(focused.color));
 }
 
 void focus_window(Window w, int color) {
@@ -77,20 +80,32 @@ void focus_color(int color) {
 	focus_window(firstwindow, color);
 }
 
+//if client acknowledges ICCCM's WM_DELETE_WINDOW, close it nicely, else KILL
 void destroy_active_window() {
-	XEvent ev;
-	 
-	//memset(&ev, 0, sizeof (ev));
-	 
-	//assumes ICCCM compliance
-	//from: https://nachtimwald.com/2009/11/08/sending-wm_delete_window-client-messages/
-	ev.xclient.type = ClientMessage;
-	ev.xclient.window = focused.id;
-	ev.xclient.message_type = XInternAtom(dpy, "WM_PROTOCOLS", True);
-	ev.xclient.format = 32;
-	ev.xclient.data.l[0] = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
-	ev.xclient.data.l[1] = CurrentTime;
-	XSendEvent(dpy, focused.id, False, NoEventMask, &ev);	
+	//please don't try and kill the root window
+	//if (focused.id == root || focused.id == UNDEFINED) return;
+	if (focused.id == UNDEFINED) return;
+
+    int i, n, found = 0;
+    Atom *protocols;
+
+    if (XGetWMProtocols(dpy, focused.id, &protocols, &n)) {
+        for (i=0; i<n; i++) if (protocols[i] == wm_delete) found++;
+        XFree(protocols);
+    }
+    if (found){
+		//from: https://nachtimwald.com/2009/11/08/sending-wm_delete_window-client-messages/
+		XEvent ev;
+		ev.xclient.type = ClientMessage;
+		ev.xclient.window = focused.id;
+		ev.xclient.message_type = XInternAtom(dpy, "WM_PROTOCOLS", True);
+		ev.xclient.format = 32;
+		ev.xclient.data.l[0] = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
+		ev.xclient.data.l[1] = CurrentTime;
+		XSendEvent(dpy, focused.id, False, NoEventMask, &ev);	
+	} else {
+		XKillClient(dpy, focused.id);
+	}
 }
 
 void add_to_windowlist(Window w, struct Position wpos, int wwidth, int wheight, int windowcolor) {
@@ -136,29 +151,39 @@ int window_exists(Window w) {
 	return 0;
 }
 
-/* cycle through windowlists until a window is found
- * the window_exists is needed as some programs create invisible windows then delete them
- * resulting in a window of color 0 being selected, messing up handle_map,
- * which attempts to colour the previously selected window back to its
- * original colour when a new window is mapped
+/* cycle through windowlists until a unfocused window is found
+ * note that the parameter given is the 
 */
 
 void focus_new_window() {
 	WindowNode *wn;
 	for (int i=0; i<NUMCOLORS; i++) {
 		wn = &windowlist[i];
-		if (wn->next != NULL) {
+		if (wn->next != NULL && wn->next->id != focused.id) {
 			wn = wn->next;
 			focus_window(wn->id, i);
 			return;
 		}
 	}
+	focused.id = UNDEFINED;
+	focused.color = UNDEFINED;
 }
 
-//???
+//"handle" here means ignore
 int handle_xerror(Display *dpy, XErrorEvent *e) {
 	printf("???\n");
 	return 0;
 }
 
 
+// SHAMELESSLY STOLEN FROM AEWM
+void set_wm_state(Window win, int state)
+{
+    CARD32 data[2];
+
+    data[0] = state;
+    data[1] = None; /* Icon? We don't need no steenking icon. */
+
+    XChangeProperty(dpy, win, wm_state, wm_state,
+        32, PropModeReplace, (unsigned char *)data, 2);
+}
