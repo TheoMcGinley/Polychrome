@@ -1,14 +1,13 @@
 #include "polychrome.h"
 
-
 Display * dpy;
-//Window root;
 
 XWindowAttributes attr;
 XButtonEvent pointerorigin;
 
 int colortracker[NUMCOLORS];
-WindowNode windowlist[NUMCOLORS];
+Client clientlist[NUMCOLORS];
+Client *focused;
 int grid[GRIDWIDTH][GRIDHEIGHT];
 
 enum SpawnConfig nextspawn;
@@ -54,8 +53,8 @@ static int initialise() {
 	//initialise the linked lists and colortracker
 	for (int i=0;i<NUMCOLORS;i++) {
 		colortracker[i] = 0;
-		windowlist[i].id = UNDEFINED;
-		windowlist[i].next = NULL;
+		clientlist[i].id = UNDEFINED;
+		clientlist[i].next = NULL;
 	}
 
 	for (int i=0; i<GRIDWIDTH; i++) {
@@ -64,8 +63,10 @@ static int initialise() {
 		}
 	}
 
-	focused.id = UNDEFINED;
-	focused.color = UNDEFINED;
+	//TODO potentially set other fields of focused?
+	focused = NULL;
+	/*focused.id = UNDEFINED;
+	focused.color = UNDEFINED;*/
 
 	//make all children of root give out notify events
 	XSelectInput (dpy, RootWindow(dpy, DefaultScreen(dpy)), SubstructureNotifyMask);    
@@ -86,6 +87,10 @@ static int initialise() {
     XGrabKey(dpy, XKeysymToKeycode(dpy, XStringToKeysym("d")), Mod1Mask,
             DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
     XGrabKey(dpy, XKeysymToKeycode(dpy, XStringToKeysym("f")), Mod1Mask,
+            DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XStringToKeysym("g")), Mod1Mask,
+            DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XStringToKeysym("h")), Mod1Mask,
             DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
     XGrabKey(dpy, XKeysymToKeycode(dpy, XStringToKeysym("q")), Mod1Mask,
             DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);

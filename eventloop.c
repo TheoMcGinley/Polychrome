@@ -60,7 +60,7 @@ static void handle_button_release(XButtonEvent *e) {
 }
 
 static void print_status() {
-	printf("focused.id: %lx,\n", focused.id);
+	printf("focused.id: %lx,\n", focused->id);
 }
 
 //use xev to find correct keysyms
@@ -81,8 +81,14 @@ static void handle_key_press(XKeyEvent *e) {
 		case 41: // "f"
 			focus_color(3);
 			break;
+		case 42: // "g"
+			double_focused_size();
+			break;
+		case 43: // "h"
+			//halve_window_size();
+			break;
 		case 24: // "q"
-			destroy_active_window();
+			destroy_focused_client();
 			break;
 		case 27: // "r"
 			start_app("java -jar ~/vlt/RuneLite.jar");
@@ -152,7 +158,7 @@ static void handle_window_map(XMapEvent *e) {
 	}
 
 	//add window to relevant linked list
-	add_to_windowlist(e->window, pos, givenwidth, givenheight, mincolor);
+	Client *c = add_to_clientlist(e->window, pos, givenwidth, givenheight, mincolor);
 
 	//print grid
 	for (int i=0; i<16; i++) {
@@ -162,7 +168,7 @@ static void handle_window_map(XMapEvent *e) {
 		printf("\n");
 	}
 
-	focus_window(e->window, mincolor);
+	focus_client(c);
 }
 
 /* we only get motion events when a button is being pressed,
@@ -235,54 +241,54 @@ static void remove_window(Window win) {
 	/*if (win == root)
 		return;*/
 
-	if (win == focused.id) {
-		focus_new_window();
+	if (win == focused->id) {
+		focus_new_client();
 	}
 
 	int windowfound = 0;
-	WindowNode *wn;
-	WindowNode *wntofree = NULL;
+	Client *c;
+	Client *clienttofree = NULL;
 
-	//find and remove window from linked lists
+	//find and remove client from linked lists
 	for (int i=0; i<NUMCOLORS && !windowfound; i++) {
-		wn = &windowlist[i];
+		c = &clientlist[i];
 
 		//if list empty, go to next list 
-		if (wn->next == NULL) {
+		if (c->next == NULL) {
 			continue;
 		}
 
-		while (wn->next != NULL) {
-			if (wn->next->id == win) {
-				wntofree = wn->next;
+		while (c->next != NULL) {
+			if (c->next->id == win) {
+				clienttofree = c->next;
 				windowfound = 1;
 				/*if the node to delete has a next node, set current next to
 				that node, else node to delete is last in list so can set current
 				next to NULL */
-				if (wn->next->next != NULL) {
-					wn->next = wn->next->next;
+				if (c->next->next != NULL) {
+					c->next = c->next->next;
 				} else {
-					wn->next = NULL;
+					c->next = NULL;
 				}
 				//remove window from colortracker
 				colortracker[i] = colortracker[i] - 1;
 				break;
 			}
-			wn = wn->next;
+			c = c->next;
 		}
 	}
 
-	if (wntofree != NULL) {
+	if (clienttofree != NULL) {
 
 		for (int i=0; i<GRIDWIDTH; i++) {
 			for (int j=0; j<GRIDHEIGHT; j++) {
-				if ( i >= wntofree->pos.x && i < (wntofree->pos.x + wntofree->width) && 
-					 j >= wntofree->pos.y && j < (wntofree->pos.y + wntofree->height)) {
+				if ( i >= clienttofree->pos.x && i < (clienttofree->pos.x + clienttofree->width) && 
+					 j >= clienttofree->pos.y && j < (clienttofree->pos.y + clienttofree->height)) {
 						grid[i][j] -= 1;
 				}
 			}
 		}
-		free(wntofree);
+		free(clienttofree);
 	}
 
 }

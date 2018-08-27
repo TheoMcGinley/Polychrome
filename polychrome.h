@@ -1,13 +1,15 @@
 #ifndef POLYCHROME_H
 #define POLYCHROME_H
 
+// INCLUDES {{{
 #include <X11/Xlib.h>
 #include <stdio.h> //printf
 #include <unistd.h> //NULL, exit, fork, sleep
 #include <stdlib.h> //NULL, malloc, free, exit, system
 #include <paths.h>
+// END_INCLUDES }}}
 
-// DEFINES }}}
+// DEFINES {{{
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define NUMCOLORS 4
@@ -28,26 +30,22 @@
 
 // STRUCTS {{{
 
-struct FocusedWindow {
-	Window id;
-	int color;
-} focused;
-
 struct Position {
 	int x;
 	int y;
 };
 
-struct WindowNode {
+struct Client {
 	Window id;
 	struct Position pos;
 	int width;
 	int height;
-	struct WindowNode *next;
+	int color;
+	struct Client *next;
 };
 
-struct WindowNode;
-typedef struct WindowNode WindowNode;
+struct Client;
+typedef struct Client Client;
 
 enum SpawnConfig {REGULAR, PORTRAIT, WIDE, LARGE};
 
@@ -68,7 +66,8 @@ extern Display * dpy;
 extern XWindowAttributes attr;
 extern XButtonEvent pointerorigin;
 extern int colortracker[NUMCOLORS];
-extern WindowNode windowlist[NUMCOLORS];
+extern Client clientlist[NUMCOLORS];
+extern Client *focused;
 extern int grid[GRIDWIDTH][GRIDHEIGHT];
 extern int nextsize;
 extern int nextorientation;
@@ -82,19 +81,20 @@ extern Atom wm_delete;
 
 // END_GLOBALS }}}
 
-// FUNCTIONS {{
+// FUNCTIONS {{{
 // events.c
 extern void event_loop(void);
 
 // utils.c 
 extern void start_app(const char *);
 extern int color_to_pixel_value(int);
+extern void double_focused_size(void);
 extern void reset_focused_border(void);
-extern void focus_window(Window, int);
-extern void focus_new_window(void);
+extern void focus_client(Client*);
+extern void focus_new_client(void);
 extern void focus_color(int);
-extern void destroy_active_window(void);
-extern void add_to_windowlist(Window, struct Position, int, int, int);
+extern void destroy_focused_client(void);
+extern Client* add_to_clientlist(Window, struct Position, int, int, int);
 //unused?
 extern int window_exists(Window);
 extern int handle_xerror(Display *, XErrorEvent *);
@@ -102,7 +102,7 @@ extern int handle_xerror(Display *, XErrorEvent *);
 //scoring.c
 //extern double calculate_score(int[][], int, int, int, int);
 //extern double calculate_score(int**, int, int, int, int);
-extern double calculate_score(int[GRIDWIDTH][GRIDHEIGHT], int, int, int, int);
+extern double calculate_score(int, int, int, int);
 extern struct Position find_best_position (int, int);
-// END_FUNCTIONS }}
+// END_FUNCTIONS }}}
 #endif // POLYCHROME_H

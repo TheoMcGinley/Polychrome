@@ -22,25 +22,47 @@ int color_to_pixel_value(int color) {
 	return 0;
 }
 
-void reset_focused_border(){
-	//if (focused.id != UNDEFINED && focused.id != root)
-	if (focused.id != UNDEFINED)
-		XSetWindowBorder(dpy, focused.id, color_to_pixel_value(focused.color));
+//find areas of grid where new client will be and icnrement them
+//XResizeWindow(dpy, focused.id, width*2, height*2)
+
+void double_focused_size() {
+
+	//increment all cells of grid newly occupied by doubling
+	for (int i=0; i<GRIDWIDTH; i++) {
+		for (int j=0; j<GRIDHEIGHT; j++) {
+			//TODO check edge conditions here
+			if (i > (focused->pos.x + focused->width) && i <= (focused->pos.x + (focused->width)*2)
+			&&  j > (focused->pos.y + focused->height) && j <= (focused->pos.y + (focused->height)*2)) { 
+				grid[i][j] += 1;
+			}
+		}
+	}
+
+	XResizeWindow(dpy, focused->id, (focused->width)*2, (focused->height)*2);
+	focused->width = focused->width * 2;
+	focused->height = focused->height * 2;
 }
 
-void focus_window(Window w, int color) {
-	XRaiseWindow(dpy, w);
-	XSetInputFocus(dpy, w, RevertToParent, CurrentTime);
-	XSetWindowBorder(dpy, w, FOCUSCOLOR);
-	focused.id = w;
-	focused.color = color;
+void reset_focused_border() {
+	//if (focused->id != UNDEFINED)
+	if (focused != NULL)
+		XSetWindowBorder(dpy, focused->id, color_to_pixel_value(focused->color));
+}
+
+//TODO make sure focused = c; really works. otherwise, set each value
+//indiviudlaly
+void focus_client(Client *c) {
+	XRaiseWindow(dpy, c->id);
+	XSetInputFocus(dpy, c->id, RevertToParent, CurrentTime);
+	XSetWindowBorder(dpy, c->id, FOCUSCOLOR);
+	focused = c;
 }
 
 void focus_color(int color) {
 
 	//if no windows of given colour exist, don't do anything
-	WindowNode *wn = &windowlist[color];
-	if (wn->next == NULL) {
+	Client *c = &clientlist[color];
+	if (c->next == NULL) {
 		return;
 	}
 
@@ -64,32 +86,32 @@ void focus_color(int color) {
 
 	reset_focused_border();
 
-	wn = wn->next;
-	Window firstwindow = wn->id;
-	while (wn->next != NULL) {
+	c = c->next;
+	Client *firstclient = c;
+	while (c->next != NULL) {
 		//scenario 1)
-		if (wn->id == focused.id) {
-			wn = wn->next;
-			focus_window(wn->id, color);
+		if (c->id == focused->id) {
+			c = c->next;
+			focus_client(c);
 			return;
 		}
-		wn = wn->next;
+		c = c->next;
 	}
 
 	//scenario 2)
-	focus_window(firstwindow, color);
+	focus_client(firstclient);
 }
 
 //if client acknowledges ICCCM's WM_DELETE_WINDOW, close it nicely, else KILL
-void destroy_active_window() {
+void destroy_focused_client() {
 	//please don't try and kill the root window
-	//if (focused.id == root || focused.id == UNDEFINED) return;
-	if (focused.id == UNDEFINED) return;
+	//if (focused->id == UNDEFINED) return;
+	if (focused == NULL) return;
 
     int i, n, found = 0;
     Atom *protocols;
 
-    if (XGetWMProtocols(dpy, focused.id, &protocols, &n)) {
+    if (XGetWMProtocols(dpy, focused->id, &protocols, &n)) {
         for (i=0; i<n; i++) if (protocols[i] == wm_delete) found++;
         XFree(protocols);
     }
@@ -97,30 +119,32 @@ void destroy_active_window() {
 		//from: https://nachtimwald.com/2009/11/08/sending-wm_delete_window-client-messages/
 		XEvent ev;
 		ev.xclient.type = ClientMessage;
-		ev.xclient.window = focused.id;
+		ev.xclient.window = focused->id;
 		ev.xclient.message_type = XInternAtom(dpy, "WM_PROTOCOLS", True);
 		ev.xclient.format = 32;
 		ev.xclient.data.l[0] = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
 		ev.xclient.data.l[1] = CurrentTime;
-		XSendEvent(dpy, focused.id, False, NoEventMask, &ev);	
+		XSendEvent(dpy, focused->id, False, NoEventMask, &ev);	
 	} else {
-		XKillClient(dpy, focused.id);
+		XKillClient(dpy, focused->id);
 	}
 }
 
-void add_to_windowlist(Window w, struct Position wpos, int wwidth, int wheight, int windowcolor) {
-	WindowNode *wn = &windowlist[windowcolor];
-	while (wn->next != NULL) {
-		wn = wn->next;
+Client*  add_to_clientlist(Window w, struct Position wpos, int wwidth, int wheight, int wcolor) {
+	Client *c = &clientlist[wcolor];
+	while (c->next != NULL) {
+		c = c->next;
 	}
 
-	WindowNode *newnode = malloc(sizeof(*newnode));
-	newnode->id = w;
-	newnode->pos = wpos;
-	newnode->width = wwidth;
-	newnode->height = wheight;
-	newnode->next = NULL;
-	wn->next = newnode;
+	Client *newclient = malloc(sizeof(*newclient));
+	newclient->id = w;
+	newclient->pos = wpos;
+	newclient->width = wwidth;
+	newclient->height = wheight;
+	newclient->color = wcolor;
+	newclient->next = NULL;
+	c->next = newclient;
+	return newclient;
 }
 
 /* it is in situations such as this that a structure such as a hashmap would
@@ -130,22 +154,22 @@ void add_to_windowlist(Window w, struct Position wpos, int wwidth, int wheight, 
  * manager with e.g. a hash map is minimal compared to the developer time taken to 
  * refactor */
 int window_exists(Window w) {
-	WindowNode *wn;
+	Client *c;
 
 	for (int i=0; i<NUMCOLORS; i++) {
-		wn = &windowlist[i];
+		c = &clientlist[i];
 
 		//if list empty, go to next list 
-		if (wn->next == NULL) {
+		if (c->next == NULL) {
 			continue;
 		}
 
-		while (wn->next != NULL) {
+		while (c->next != NULL) {
 
-			if (wn->next->id == w) {
+			if (c->next->id == w) {
 				return 1;
 			}
-			wn = wn->next;
+			c = c->next;
 		}
 	}
 	return 0;
@@ -155,18 +179,19 @@ int window_exists(Window w) {
  * note that the parameter given is the 
 */
 
-void focus_new_window() {
-	WindowNode *wn;
+void focus_new_client() {
+	Client *c;
 	for (int i=0; i<NUMCOLORS; i++) {
-		wn = &windowlist[i];
-		if (wn->next != NULL && wn->next->id != focused.id) {
-			wn = wn->next;
-			focus_window(wn->id, i);
+		c = &clientlist[i];
+		if (c->next != NULL && c->next->id != focused->id) {
+			c = c->next;
+			focus_client(c);
 			return;
 		}
 	}
-	focused.id = UNDEFINED;
-	focused.color = UNDEFINED;
+	focused = NULL;
+	/*focused->id = UNDEFINED;
+	focused->color = UNDEFINED;*/
 }
 
 //"handle" here means ignore
