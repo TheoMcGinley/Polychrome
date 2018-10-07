@@ -7,6 +7,15 @@ void start_app(const char *command) {
 	}
 }
 
+void set_new_window_dimensions(int dimension) {
+	switch (dimension) {
+		case REGULAR: 	newdimensions = REGULAR; break;
+		case PORTRAIT: 	newdimensions = PORTRAIT; break;
+		case WIDE: 		newdimensions = WIDE; break;
+		case EXTRA: 	newdimensions = EXTRA; break;
+	}
+}
+
 int color_to_pixel_value(int color) {
 	switch (color) {
 		case 0:
@@ -22,25 +31,71 @@ int color_to_pixel_value(int color) {
 	return 0;
 }
 
-//find areas of grid where new client will be and icnrement them
-//XResizeWindow(dpy, focused.id, width*2, height*2)
-
-void double_focused_size() {
-
-	//increment all cells of grid newly occupied by doubling
+void increment_focused_size() {
+	//find areas of grid where new client will be and increment them
 	for (int i=0; i<GRIDWIDTH; i++) {
 		for (int j=0; j<GRIDHEIGHT; j++) {
-			//TODO check edge conditions here
-			if (i > (focused->pos.x + focused->width) && i <= (focused->pos.x + (focused->width)*2)
-			&&  j > (focused->pos.y + focused->height) && j <= (focused->pos.y + (focused->height)*2)) { 
+			if ((i == (focused->pos.x + focused->width) && j >= focused->pos.y && j <= focused->pos.y + focused->height)
+			|| (j == (focused->pos.y + focused->height) && i >= focused->pos.x && i <= focused->pos.x + focused->height)) {
 				grid[i][j] += 1;
 			}
 		}
 	}
+	XResizeWindow(dpy, focused->id, ((focused->width)+1)*CELLWIDTH - 2*BORDERTHICKNESS, ((focused->height)+1)*CELLHEIGHT - 2*BORDERTHICKNESS);
+	focused->width = focused->width+1;
+	focused->height = focused->height+1;
+}
 
-	XResizeWindow(dpy, focused->id, (focused->width)*2, (focused->height)*2);
+//TODO don't allow if it makes it too small
+void decrement_focused_size() {
+
+	if (focused->width == 1 || focused->height == 1) return;
+
+	//find areas of grid where newly created space will be and decrement them
+	for (int i=0; i<GRIDWIDTH; i++) {
+		for (int j=0; j<GRIDHEIGHT; j++) {
+			if ((i == (focused->pos.x + focused->width - 1) && j >= focused->pos.y && j <= (focused->pos.y + focused->height - 1))
+			|| (j == (focused->pos.y + focused->height - 1) && i >= focused->pos.x && i <= (focused->pos.x + focused->height - 1))) {
+				grid[i][j] -= 1;
+			}
+		}
+	}
+	XResizeWindow(dpy, focused->id, ((focused->width)-1)*CELLWIDTH - 2*BORDERTHICKNESS, ((focused->height)-1)*CELLHEIGHT - 2*BORDERTHICKNESS);
+
+	focused->width = focused->width-1;
+	focused->height = focused->height-1;
+}
+
+void double_focused_size() {
+	//increment all cells of grid newly occupied by doubling
+	for (int i=0; i<GRIDWIDTH; i++) {
+		for (int j=0; j<GRIDHEIGHT; j++) {
+
+			if ((i >= (focused->pos.x + focused->width) && i < (focused->pos.x + focused->width*2) && 
+						j >= focused->pos.y && j < focused->pos.y + focused->height*2) ||
+				(j >= (focused->pos.y + focused->height) && j < (focused->pos.y + focused->height*2) && 
+						i >= focused->pos.x && i < focused->pos.x + focused->width*2)) {
+				grid[i][j] += 1;
+			}
+
+
+			/*if (i > (focused->pos.x + focused->width) && i <= (focused->pos.x + (focused->width)*2)
+			&&  j > (focused->pos.y + focused->height) && j <= (focused->pos.y + (focused->height)*2)) { 
+				grid[i][j] += 1;
+			}*/
+		}
+	}
+
+	XResizeWindow(dpy, focused->id, ((focused->width)*2)*CELLWIDTH - 2*BORDERTHICKNESS, ((focused->height)*2)*CELLHEIGHT - 2*BORDERTHICKNESS);
 	focused->width = focused->width * 2;
 	focused->height = focused->height * 2;
+}
+
+void halve_focused_size() {
+
+	if (focused->width == 1 || focused->height == 1) return;
+
+	printf("haha yes\n");
 }
 
 void reset_focused_border() {

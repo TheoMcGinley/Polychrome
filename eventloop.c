@@ -65,50 +65,74 @@ static void print_status() {
 
 //use xev to find correct keysyms
 static void handle_key_press(XKeyEvent *e) {
-	switch(e->keycode) {
-		case 36: // enter
-			start_app("urxvt");
-			break;
-		case 38: // "a"
-			focus_color(0);
-			break;
-		case 39: // "s"
-			focus_color(1);
-			break;
-		case 40: // "d"
-			focus_color(2);
-			break;
-		case 41: // "f"
-			focus_color(3);
-			break;
-		case 42: // "g"
-			double_focused_size();
-			break;
-		case 43: // "h"
-			//halve_window_size();
-			break;
-		case 24: // "q"
-			destroy_focused_client();
-			break;
-		case 27: // "r"
-			start_app("java -jar ~/vlt/RuneLite.jar");
-			break;
-		case 33: // "p"
-			//start_app("scrot -u ~/pix/scrots/%Y-%m-%d-%T-screenshot.png");
-			print_status();
-			break;
-		case 52: // "z"
-			start_app("mpc toggle -q");
-			break;
-		case 53: // "x"
-			start_app("mpc next -q");
-			break;
-		case 54: // "c"
-			start_app("nextalbum");
-			break;
-		case 56: // "b"
-			start_app("firefox");
-			break;
+	//SHIFT + MOD
+	if ((e->state & (ShiftMask|Mod1Mask)) == (ShiftMask|Mod1Mask)) {
+		switch(e->keycode) {
+			case 42: // Shift+g
+				halve_focused_size();
+				return;
+			case 43:
+				double_focused_size();
+				return;
+		}
+	}
+	
+	//MOD 
+
+	if ((e->state & (Mod1Mask)) == (Mod1Mask)) {
+		switch(e->keycode) {
+			case 36: // enter
+				start_app("urxvt");
+				break;
+			case 38: // "a"
+				focus_color(0);
+				break;
+			case 39: // "s"
+				focus_color(1);
+				break;
+			case 40: // "d"
+				focus_color(2);
+				break;
+			case 41: // "f"
+				focus_color(3);
+				break;
+			case 42: // "g"
+				decrement_focused_size();
+				break;
+			case 43: // "h"
+				increment_focused_size();
+				break;
+			case 24: // "q"
+				destroy_focused_client();
+				break;
+			case 25: // "w"
+				set_new_window_dimensions(WIDE);
+				break;
+			case 26: // "w"
+				set_new_window_dimensions(EXTRA);
+				break;
+			case 27: // "r"
+				//start_app("java -jar ~/vlt/RuneLite.jar");
+				set_new_window_dimensions(REGULAR);
+				break;
+			case 33: // "p"
+				//start_app("scrot -u ~/pix/scrots/%Y-%m-%d-%T-screenshot.png");
+				set_new_window_dimensions(PORTRAIT);
+				//print_status();
+				break;
+			case 52: // "z"
+				start_app("mpc toggle -q");
+				break;
+			case 53: // "x"
+				start_app("mpc next -q");
+				break;
+			case 54: // "c"
+				start_app("nextalbum");
+				break;
+			case 56: // "b"
+				start_app("firefox");
+				break;
+		}
 	}
 }
 
@@ -136,29 +160,46 @@ static void handle_window_map(XMapEvent *e) {
 	//set border of old focus back to regular color
 	reset_focused_border();
 
-	int givenwidth = 4;
-	int givenheight = 4;
+	int clientwidth, clientheight;
+	switch (newdimensions) {
+		case REGULAR:
+			clientwidth = 4;
+			clientheight = 4;
+			break;
+		case PORTRAIT:
+			clientwidth = 4;
+			clientheight = 8;
+			break;
+		case WIDE:
+			clientwidth = 8;
+			clientheight = 4;
+			break;
+		case EXTRA:
+			clientwidth = 8;
+			clientheight = 8;
+			break;
+	}
 	/* find the best position for the window using the scoring system, then move
 	it there, accounting for border thickness */
-	struct Position pos = find_best_position(givenwidth, givenheight);
+	struct Position pos = find_best_position(clientwidth, clientheight);
 
 	XMoveResizeWindow(dpy, e->window, (pos.x*CELLWIDTH)+BORDERTHICKNESS,
-			(pos.y*CELLHEIGHT)+BORDERTHICKNESS, (givenwidth*CELLWIDTH)-(2*BORDERTHICKNESS),
-			(givenheight*CELLHEIGHT)-(2*BORDERTHICKNESS));
+			(pos.y*CELLHEIGHT)+BORDERTHICKNESS, (clientwidth*CELLWIDTH)-(2*BORDERTHICKNESS),
+			(clientheight*CELLHEIGHT)-(2*BORDERTHICKNESS));
 	printf("x: %d, y: %d\n", pos.x, pos.y);
 
 	//populate_grid
 	for (int i=0; i<GRIDWIDTH; i++) {
 		for (int j=0; j<GRIDHEIGHT; j++) {
-			if ( i >= pos.x && i < (pos.x+givenheight) && 
-			  	 j >= pos.y && j < (pos.y+givenheight)) {
+			if ( i >= pos.x && i < (pos.x+clientheight) && 
+			  	 j >= pos.y && j < (pos.y+clientheight)) {
 					grid[i][j] += 1;
 			}
 		}
 	}
 
 	//add window to relevant linked list
-	Client *c = add_to_clientlist(e->window, pos, givenwidth, givenheight, mincolor);
+	Client *c = add_to_clientlist(e->window, pos, clientwidth, clientheight, mincolor);
 
 	//print grid
 	for (int i=0; i<16; i++) {
@@ -169,6 +210,8 @@ static void handle_window_map(XMapEvent *e) {
 	}
 
 	focus_client(c);
+	//TODO make this a setting
+	newdimensions = REGULAR;
 }
 
 /* we only get motion events when a button is being pressed,

@@ -10,7 +10,7 @@ Client clientlist[NUMCOLORS];
 Client *focused;
 int grid[GRIDWIDTH][GRIDHEIGHT];
 
-enum SpawnConfig nextspawn;
+enum NewWindowDimensions newdimensions;
 
 Atom wm_state;
 Atom wm_change_state;
@@ -65,6 +65,7 @@ static int initialise() {
 
 	//TODO potentially set other fields of focused?
 	focused = NULL;
+	newdimensions = REGULAR;
 	/*focused.id = UNDEFINED;
 	focused.color = UNDEFINED;*/
 
@@ -102,10 +103,26 @@ static int initialise() {
             DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
     XGrabKey(dpy, XKeysymToKeycode(dpy, XStringToKeysym("b")), Mod1Mask,
             DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XStringToKeysym("p")), Mod1Mask,
+            DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
+	//orientations
     XGrabKey(dpy, XKeysymToKeycode(dpy, XStringToKeysym("r")), Mod1Mask,
             DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
     XGrabKey(dpy, XKeysymToKeycode(dpy, XStringToKeysym("p")), Mod1Mask,
             DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XStringToKeysym("w")), Mod1Mask,
+            DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XStringToKeysym("e")), Mod1Mask,
+            DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
+
+
+
+	//SHIFTS
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XStringToKeysym("g")), ShiftMask|Mod1Mask,
+            DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XStringToKeysym("h")), ShiftMask|Mod1Mask,
+            DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
+
 
     pointerorigin.subwindow = None;
 

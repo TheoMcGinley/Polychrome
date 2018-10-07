@@ -47,7 +47,8 @@ struct Client {
 struct Client;
 typedef struct Client Client;
 
-enum SpawnConfig {REGULAR, PORTRAIT, WIDE, LARGE};
+//use QUEENLY (portrait) so that it's QWER?
+enum NewWindowDimensions {REGULAR, PORTRAIT, WIDE, EXTRA};
 
 
 /*
@@ -69,8 +70,9 @@ extern int colortracker[NUMCOLORS];
 extern Client clientlist[NUMCOLORS];
 extern Client *focused;
 extern int grid[GRIDWIDTH][GRIDHEIGHT];
-extern int nextsize;
-extern int nextorientation;
+//extern int nextsize;
+//extern int nextorientation;
+extern enum NewWindowDimensions newdimensions;
 
 extern Atom wm_state;
 extern Atom wm_change_state;
@@ -88,6 +90,10 @@ extern void event_loop(void);
 // utils.c 
 extern void start_app(const char *);
 extern int color_to_pixel_value(int);
+extern void set_new_window_dimensions(int);
+extern void increment_focused_size(void);
+extern void decrement_focused_size(void);
+extern void halve_focused_size(void);
 extern void double_focused_size(void);
 extern void reset_focused_border(void);
 extern void focus_client(Client*);
