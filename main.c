@@ -31,6 +31,24 @@ int main(void) {
 	return 0;
 }
 
+// Look for windows that already exist 
+static void scan_wins(void)
+{
+    unsigned int nwins, i;
+    Window dummyw1, dummyw2, *wins;
+    XWindowAttributes attr;
+
+    XQueryTree(dpy, DefaultRootWindow(dpy), &dummyw1, &dummyw2, &wins, &nwins);
+    for (i = 0; i < nwins; i++) {
+        XGetWindowAttributes(dpy, wins[i], &attr);
+        if (!attr.override_redirect && attr.map_state == IsViewable)
+            XMapWindow(dpy, wins[i]);
+    }
+    XFree(wins);
+}
+
+
+
 static int initialise() {
 
     if(!(dpy = XOpenDisplay(0x0))) {
@@ -126,7 +144,7 @@ static int initialise() {
 
     pointerorigin.subwindow = None;
 
-	printf("init over\n");
+	scan_wins();
 	return 1;
 }
 

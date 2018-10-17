@@ -21,8 +21,11 @@
 #define GRIDHEIGHT 16 
 //#define CELLWIDTH (WidthOfScreen()/GRIDSIZE) //TODO make these work
 //#define CELLHEIGHT (HeightOfScreen()/GRIDSIZE)
-#define CELLWIDTH 240
-#define CELLHEIGHT 135
+//#define cellwidth 240 //for 4k
+//#define cellheight 135 //for 4k
+#define CELLWIDTH 48 //for notebook
+#define CELLHEIGHT 27 //for notebook
+
 #define BORDERTHICKNESS 10
 
 

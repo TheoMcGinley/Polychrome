@@ -189,9 +189,10 @@ static void handle_window_map(XMapEvent *e) {
 	printf("x: %d, y: %d\n", pos.x, pos.y);
 
 	//populate_grid
+	//TODO fix this?? looks wrong??
 	for (int i=0; i<GRIDWIDTH; i++) {
 		for (int j=0; j<GRIDHEIGHT; j++) {
-			if ( i >= pos.x && i < (pos.x+clientheight) && 
+			if ( i >= pos.x && i < (pos.x+clientwidth) && 
 			  	 j >= pos.y && j < (pos.y+clientheight)) {
 					grid[i][j] += 1;
 			}
