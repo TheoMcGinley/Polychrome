@@ -71,9 +71,11 @@ static void handle_key_press(XKeyEvent *e) {
 			case 42: // Shift+g
 				halve_focused_size();
 				return;
-			case 43:
+			case 43: // shift+h
 				double_focused_size();
 				return;
+			case 65: //shift+space
+				show_active_window();
 		}
 	}
 	
@@ -131,6 +133,9 @@ static void handle_key_press(XKeyEvent *e) {
 				break;
 			case 56: // "b"
 				start_app("firefox");
+				break;
+			case 65:
+				hide_active_window();
 				break;
 		}
 	}
