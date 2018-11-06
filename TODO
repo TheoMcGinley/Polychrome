@@ -1,18 +1,28 @@
-Port from AEWM: events.c:
-	* hide() for client message (ICCCM) (+ using set_wm_state() correctly)
-	* deal with configurerequests
-new.c:
-	get hints when creating a new window
-	sanity checks for window sizes and such
+== TODO ==
 
+1) Project refactor 
+	- split files into smaller, more meaningful files (e.g. hide.c, resize.c)
+	- rename to use golang case 
+	- keep names consistent (e.g. focused vs active vs current)
 
-POLYCHROME TODO:
-* sort out git + github:
-	- archive, fork and nix to the gitignore
-	- all the same, none of this weird modified stuff
-	
-* after all AEWM fixes, save current state as "floating mode" (new branch?)
-* add "dynamic mode":
+2) Implement hide:
+	- start with hiding.c
+	- make a stack local to hiding.c
+	- when hide called
+
+3) Handle configurerequests
+	- refer to aewm
+
+4) Sanity checks
+	- ensure windows cannot be shrunk to below their minimum:
+		* refer to aewm to see how to get hints for windows
+		* when resizing a window, use these hints to check to make sure the window is not being resizing beyond a limit
+
+5) Once polished, release to master as v1.0.0
+	- branch off as "floating mode"
+	- make a new branch "dynamic mode"
+
+6) add "dynamic mode":
 	- 1st window spawns in middle
 	- 2nd window spawns next to it or below it (depending on dimensions), moving window to make space
 	- 3rd spawns in middle below, left and right are shifted up
