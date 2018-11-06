@@ -1,0 +1,103 @@
+Port from AEWM: events.c:
+	* hide() for client message (ICCCM) (+ using set_wm_state() correctly)
+	* deal with configurerequests
+new.c:
+	get hints when creating a new window
+	sanity checks for window sizes and such
+
+
+POLYCHROME TODO:
+* sort out git + github:
+	- archive, fork and nix to the gitignore
+	- all the same, none of this weird modified stuff
+	
+* after all AEWM fixes, save current state as "floating mode" (new branch?)
+* add "dynamic mode":
+	- 1st window spawns in middle
+	- 2nd window spawns next to it or below it (depending on dimensions), moving window to make space
+	- 3rd spawns in middle below, left and right are shifted up
+
+case conditions:
+	* big, big, big, big
+	* big, big, small, big
+
+* make quadtree wm
+	- 4 linked lists are now for each quadrant OR
+	- window struct has a number which indicates position: 1,2,3,4 is upper left, 5,6,7,8 is upper right etc
+	- allows moving to another quadrant by adding 4 (%16)
+-------------------------------------------------------------------------------------------
+
+== Features ==
+* allow for avoidance of areas by adding +10 to unwanted grid areas
+* improve scoring system
+* Sloppy grid-based window placement
+	* optional extra: still use grid, but use hint size as actual size and center it in the grid
+* Pseudo-fullscreen
+* Anti-image-retention
+* Virtual desktops (with stickiness/bezelless)
+
+== Bonus ==
+* bum or cover.sh-esque bar
+
+== Fixes ==
+
+* consider putting colortracker, windowlist and grid into a workspacestate struct
+* make an alternative for xterm at start
+	i.e. make it so that polychrome doesn't end when the xterm is killed
+* proper error handling 
+
+
+=== PLACEMENT ===
+1) ALWAYS CENTERING (BRUISER, biggest first)
+	1 window: centered, using hints (rounded up to nearest grid) (easy)
+	2 windows: if window wider than ASPECTRATIO, spawn below, else spawn next to center. readjust
+	3 windows: if window wider than ASPECT RATIO, spawn below, else spawn enxt to center. readjust
+	
+	+:
+		* don't get the quartermaster problem: big windows far away
+		* 
+	-: 
+		* can get janky for higher number, very hard to get it to go where it "should" go
+		* windows move around a lot
+
+2) PRESET POSITIONS
+	16 positions for "small" windows, 8 for "medium", 4 for "large"
+	large > medium > small (i.e. if small window in the way for large spawn, move small)
+	+: 
+		* easy to implement
+		* can avoid small polybars
+	-:
+		* unclear where moved windows will move to for user
+
+3) HUNG, DRAWN AND QUARTERED (THE QUARTERMASTER)
+	screen split into 4, each quarter spawns windows as close to the centre of screen (e.g. near bottom right for the top left quarter)
+	in each quadrant:
+		can spawn:
+			* regular (1x1, no modifier)
+			* portrait (1x2, mod+P)
+			* wide (2x1, mod+W)
+			* big (2x2, mod+B)
+			* specify a quadrant (mod+A/S/D/F)
+
+	+:
+		* always get windows roughly near centre
+		* know where next window will spawn
+		* easy to select windows
+	-:
+		* can't really have big central window
+			solution: add a "central" option for windows
+		* can't "share" between quarters
+		* big windows will always be far away in corners
+		* don't feel like you're making the most of the space given
+
+
+4) grid-based scoring
+	use a scoring algorithm to determine best place for next window
+
+	+: 
+		* can avoid small polybars
+		* easy to make the most of the space
+	-:
+		* very hard to get right
+		* doesn't always spawn properly
+
