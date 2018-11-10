@@ -1,7 +1,7 @@
 #include "polychrome.h"
 #include "limits.h"
 
-static double calc_blocking_score(int windowx, int windowy, int windowwidth, int windowheight) {
+static double calcBlockingScore(int windowx, int windowy, int windowwidth, int windowheight) {
 	double score = 0;
 	//for each cell
 	for (int i=0; i<GRIDWIDTH; i++) {
@@ -19,13 +19,13 @@ static double calc_blocking_score(int windowx, int windowy, int windowwidth, int
 	return score;
 }
 
-static int is_offscreen(int windowx, int windowy, int windowwidth, int windowheight) {
+static int isOffscreen(int windowx, int windowy, int windowwidth, int windowheight) {
 	if ((windowx + windowwidth) > GRIDWIDTH || (windowy + windowheight) > GRIDHEIGHT)
 		return 1;	
 	return 0;
 }
 
-static double calc_positional_score(int windowx, int windowy, int windowwidth, int windowheight) {
+static double calcPositionalScore(int windowx, int windowy, int windowwidth, int windowheight) {
 	//find perfect spot given window dimensions
 	int perfectx = (GRIDWIDTH/2)-(windowwidth/2);
 	int perfecty = (GRIDHEIGHT/2)-(windowheight/2);
@@ -35,25 +35,25 @@ static double calc_positional_score(int windowx, int windowy, int windowwidth, i
 }
 
 //windowwidth, windowheight uses cells as its unit
-double calculate_score(int windowx, int windowy, int windowwidth, int windowheight) {
+double calculateScore(int windowx, int windowy, int windowwidth, int windowheight) {
 	if (is_offscreen(windowx, windowy, windowwidth, windowheight)) 
 		return INT_MAX;
-	return calc_blocking_score(windowx, windowy, windowwidth, windowheight) +
-	       calc_positional_score(windowx, windowy, windowwidth, windowheight);
+	return calcBlockingScore(windowx, windowy, windowwidth, windowheight) +
+	       calcPositionalScore(windowx, windowy, windowwidth, windowheight);
 }
 
-struct Position find_best_position (int windowwidth, int windowheight) {
+struct Position findBestPosition (int windowwidth, int windowheight) {
 	struct Position bestposition;
 	bestposition.x = 0;
 	bestposition.y = 0;
 	double bestscore, tmpscore;
 	//bestscore = tmpscore = calculate_score(0, 0, windowwidth, windowheight);
-	bestscore = tmpscore = calculate_score(0, 0, windowwidth, windowheight);
+	bestscore = tmpscore = calculateScore(0, 0, windowwidth, windowheight);
 
 	for (int i=0; i<GRIDWIDTH; i++) {
 		for (int k=0; k<GRIDHEIGHT; k++) {
 			//tmpscore = calculate_score(i, k, windowwidth, windowheight);
-			tmpscore = calculate_score(i, k, windowwidth, windowheight);
+			tmpscore = calculateScore(i, k, windowwidth, windowheight);
 			if (tmpscore < bestscore) {
 				bestscore = tmpscore;
 				bestposition.x = i;

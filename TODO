@@ -1,9 +1,7 @@
 == TODO ==
 
 1) Project refactor 
-	- split files into smaller, more meaningful files (e.g. hide.c, resize.c)
-	- rename to use golang case 
-	- keep names consistent (e.g. focused vs active vs current)
+	move window creation and deletion to manage.c
 
 2) Implement hide:
 	- start with hiding.c

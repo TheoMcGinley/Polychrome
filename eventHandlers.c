@@ -1,40 +1,38 @@
 #include "polychrome.h"
 
-static void handle_button_press(XButtonEvent *);
-static void handle_button_release(XButtonEvent *);
-static void handle_key_press(XKeyEvent *);
-static void handle_unmap_event(XUnmapEvent *);
-static void handle_window_destruction(XDestroyWindowEvent *);
-static void handle_motion(XMotionEvent *);
-static void handle_window_map(XMapEvent *);
-static void handle_client_message(XClientMessageEvent *);
-static void remove_window(Window);
+static void handleButtonPress(XButtonEvent *);
+static void handleButtonRelease(XButtonEvent *);
+static void handleKeyPress(XKeyEvent *);
+static void handleUnmapEvent(XUnmapEvent *);
+static void handleWindowDestruction(XDestroyWindowEvent *);
+static void handleMotion(XMotionEvent *);
+static void handleWindowMap(XMapEvent *);
+static void handleClientMessage(XClientMessageEvent *);
+static void removeWindow(Window);
 
-void event_loop() {
+void handleEvents() {
 	XEvent ev;
-    for(;;)
-    {
+    for(;;) {
 
         XNextEvent(dpy, &ev);
 
-		//FROM AEWM
 		switch (ev.type) {
             case ButtonPress:
-                handle_button_press(&ev.xbutton); break;
+                handleButtonPress(&ev.xbutton); break;
             case ButtonRelease:
-                handle_button_release(&ev.xbutton); break;
+                handleButtonRelease(&ev.xbutton); break;
 			case KeyPress:
-				handle_key_press(&ev.xkey); break;
+				handleKeyPress(&ev.xkey); break;
 			case MapNotify:
-				handle_window_map(&ev.xmap); break;
+				handleWindowMap(&ev.xmap); break;
             case UnmapNotify:
-                handle_unmap_event(&ev.xunmap); break;
+                handleUnmapEvent(&ev.xunmap); break;
 			case DestroyNotify:
-				handle_window_destruction(&ev.xdestroywindow); break;
+				handleWindowDestruction(&ev.xdestroywindow); break;
 			case MotionNotify:
-				handle_motion(&ev.xmotion); break;
+				handleMotion(&ev.xmotion); break;
             case ClientMessage:
-                handle_client_message(&ev.xclient); break;
+                handleClientMessage(&ev.xclient); break;
             case ConfigureRequest:
                 printf("ConfigureRequest received\n"); break;
 			case Expose:
@@ -48,34 +46,34 @@ void event_loop() {
     }
 }
 
-static void handle_button_press(XButtonEvent *e) {
+static void handleButtonPress(XButtonEvent *e) {
 	if (e->subwindow != None) {
 		XGetWindowAttributes(dpy, e->subwindow, &attr);
 		pointerorigin = *e;
 	}
 }
 
-static void handle_button_release(XButtonEvent *e) {
+static void handleButtonRelease(XButtonEvent *e) {
 	pointerorigin.subwindow = None;
 }
 
-static void print_status() {
+static void printStatus() {
 	printf("focused.id: %lx,\n", focused->id);
 }
 
 //use xev to find correct keysyms
-static void handle_key_press(XKeyEvent *e) {
+static void handleKeyPress(XKeyEvent *e) {
 	//SHIFT + MOD
 	if ((e->state & (ShiftMask|Mod1Mask)) == (ShiftMask|Mod1Mask)) {
 		switch(e->keycode) {
 			case 42: // Shift+g
-				halve_focused_size();
+				halveFocusedSize();
 				return;
 			case 43: // shift+h
-				double_focused_size();
+				doubleFocusedSize();
 				return;
 			case 65: //shift+space
-				show_active_window();
+				showNextHidden();
 		}
 	}
 	
@@ -84,70 +82,72 @@ static void handle_key_press(XKeyEvent *e) {
 	if ((e->state & (Mod1Mask)) == (Mod1Mask)) {
 		switch(e->keycode) {
 			case 36: // enter
-				start_app("urxvt");
+				startApp("urxvt");
 				break;
 			case 38: // "a"
-				focus_color(0);
+				focusColor(0);
 				break;
 			case 39: // "s"
-				focus_color(1);
+				focusColor(1);
 				break;
 			case 40: // "d"
-				focus_color(2);
+				focusColor(2);
 				break;
 			case 41: // "f"
-				focus_color(3);
+				focusColor(3);
 				break;
 			case 42: // "g"
-				decrement_focused_size();
+				decrementFocusedSize();
 				break;
 			case 43: // "h"
-				increment_focused_size();
+				incrementFocusedSize();
 				break;
 			case 24: // "q"
-				destroy_focused_client();
+				destroyFocusedClient();
 				break;
 			case 25: // "w"
-				set_new_window_dimensions(WIDE);
+				setNewWindowDimensions(WIDE);
 				break;
 			case 26: // "w"
-				set_new_window_dimensions(EXTRA);
+				setNewWindowDimensions(EXTRA);
 				break;
 			case 27: // "r"
 				//start_app("java -jar ~/vlt/RuneLite.jar");
-				set_new_window_dimensions(REGULAR);
+				setNewWindowDimensions(REGULAR);
 				break;
 			case 33: // "p"
 				//start_app("scrot -u ~/pix/scrots/%Y-%m-%d-%T-screenshot.png");
-				set_new_window_dimensions(PORTRAIT);
+				setNewWindowDimensions(PORTRAIT);
 				//print_status();
 				break;
 			case 52: // "z"
-				start_app("mpc toggle -q");
+				startApp("mpc toggle -q");
 				break;
 			case 53: // "x"
-				start_app("mpc next -q");
+				startApp("mpc next -q");
 				break;
 			case 54: // "c"
-				start_app("nextalbum");
+				startApp("nextalbum");
 				break;
 			case 56: // "b"
-				start_app("firefox");
+				startApp("firefox");
 				break;
 			case 65:
-				hide_active_window();
+				hideActiveWindow();
 				break;
 		}
 	}
 }
 
-static void handle_window_map(XMapEvent *e) {
+static void handleWindowMap(XMapEvent *e) {
 	
 	//don't retrack an existing window
-	if (window_exists(e->window)) {
+	if (windowExists(e->window)) {
 		//set_wm_state(e->window, NormalState)
 		return;
 	}
+
+	addNewWindow(XMapEvent *e);
 
 	//find rarest color and update tracker
 	int minvalue = colortracker[0];
@@ -163,38 +163,20 @@ static void handle_window_map(XMapEvent *e) {
 	XSetWindowBorderWidth(e->display, e->window, BORDERTHICKNESS);
 
 	//set border of old focus back to regular color
-	reset_focused_border();
+	resetFocusedBorder();
 
-	int clientwidth, clientheight;
-	switch (newdimensions) {
-		case REGULAR:
-			clientwidth = 4;
-			clientheight = 4;
-			break;
-		case PORTRAIT:
-			clientwidth = 4;
-			clientheight = 8;
-			break;
-		case WIDE:
-			clientwidth = 8;
-			clientheight = 4;
-			break;
-		case EXTRA:
-			clientwidth = 8;
-			clientheight = 8;
-			break;
-	}
+	// clientDimensions.x refers to width, clientDimensions.y refers to height
+	struct Position clientDimensions = getNewWindowDimensions();
+
 	/* find the best position for the window using the scoring system, then move
 	it there, accounting for border thickness */
-	struct Position pos = find_best_position(clientwidth, clientheight);
-
+	struct Position pos = findBestPosition(clientDimensions.x, clientDimensions.y);
 	XMoveResizeWindow(dpy, e->window, (pos.x*CELLWIDTH)+BORDERTHICKNESS,
-			(pos.y*CELLHEIGHT)+BORDERTHICKNESS, (clientwidth*CELLWIDTH)-(2*BORDERTHICKNESS),
-			(clientheight*CELLHEIGHT)-(2*BORDERTHICKNESS));
+			(pos.y*CELLHEIGHT)+BORDERTHICKNESS, (clientDimensions.x*CELLWIDTH)-(2*BORDERTHICKNESS),
+			(clientDimensions.y*CELLHEIGHT)-(2*BORDERTHICKNESS));
 	printf("x: %d, y: %d\n", pos.x, pos.y);
 
 	//populate_grid
-	//TODO fix this?? looks wrong??
 	for (int i=0; i<GRIDWIDTH; i++) {
 		for (int j=0; j<GRIDHEIGHT; j++) {
 			if ( i >= pos.x && i < (pos.x+clientwidth) && 
@@ -205,7 +187,7 @@ static void handle_window_map(XMapEvent *e) {
 	}
 
 	//add window to relevant linked list
-	Client *c = add_to_clientlist(e->window, pos, clientwidth, clientheight, mincolor);
+	Client *c = addToClientlist(e->window, pos, clientwidth, clientheight, mincolor);
 
 	//print grid
 	for (int i=0; i<16; i++) {
@@ -222,7 +204,7 @@ static void handle_window_map(XMapEvent *e) {
 
 /* we only get motion events when a button is being pressed,
  * but we still have to check that the drag started on a window */
-static void handle_motion(XMotionEvent *e) {
+static void handleMotion(XMotionEvent *e) {
 	/*
 	* here we could "compress" motion notify events by doing:
 	 *
@@ -270,86 +252,25 @@ static void handle_motion(XMotionEvent *e) {
 	}
 }
 
-//removes deleted window from linkedlist and colortracker
-static void handle_window_destruction(XDestroyWindowEvent *e) {
-	if (window_exists(e->window))
-		remove_window(e->window);
+static void handleWindowDestruction(XDestroyWindowEvent *e) {
+	if (windowExists(e->window))
+		removeWindow(e->window);
 }
 
-static void handle_unmap_event(XUnmapEvent *e) {
-	if (window_exists(e->window))
-		remove_window(e->window);
-}
-
-//problem: focus_new_window() focuses same window if the window to remove is
-//the first
-static void remove_window(Window win) {
-
-
-	printf("WIN: %lx\n", win);
-	/*if (win == root)
-		return;*/
-
-	if (win == focused->id) {
-		focus_new_client();
-	}
-
-	int windowfound = 0;
-	Client *c;
-	Client *clienttofree = NULL;
-
-	//find and remove client from linked lists
-	for (int i=0; i<NUMCOLORS && !windowfound; i++) {
-		c = &clientlist[i];
-
-		//if list empty, go to next list 
-		if (c->next == NULL) {
-			continue;
-		}
-
-		while (c->next != NULL) {
-			if (c->next->id == win) {
-				clienttofree = c->next;
-				windowfound = 1;
-				/*if the node to delete has a next node, set current next to
-				that node, else node to delete is last in list so can set current
-				next to NULL */
-				if (c->next->next != NULL) {
-					c->next = c->next->next;
-				} else {
-					c->next = NULL;
-				}
-				//remove window from colortracker
-				colortracker[i] = colortracker[i] - 1;
-				break;
-			}
-			c = c->next;
-		}
-	}
-
-	if (clienttofree != NULL) {
-
-		for (int i=0; i<GRIDWIDTH; i++) {
-			for (int j=0; j<GRIDHEIGHT; j++) {
-				if ( i >= clienttofree->pos.x && i < (clienttofree->pos.x + clienttofree->width) && 
-					 j >= clienttofree->pos.y && j < (clienttofree->pos.y + clienttofree->height)) {
-						grid[i][j] -= 1;
-				}
-			}
-		}
-		free(clienttofree);
-	}
-
+static void handleUnmapEvent(XUnmapEvent *e) {
+	if (windowExists(e->window))
+		removeWindow(e->window);
 }
 
 // All that is required by ICCM is iconify (hide)
-static void handle_client_message(XClientMessageEvent *e)
-{
+static void handleClientMessage(XClientMessageEvent *e) {
 	printf("PRETENDING TO HIDE\n");
-    /*client_t *c = find_client(e->window, MATCH_WINDOW);
+    /*client_t *c = find_client(e->window, MATCH_WINDOW);*/
 
-    if (c && e->message_type == wm_change_state &&
-        e->format == 32 && e->data.l[0] == IconicState) hide(c);*/
+    if (e->message_type == wm_change_state && 
+			e->format == 32 && e->data.l[0] == IconicState) {
+		hide(e->window);
+	}
 }
 
 

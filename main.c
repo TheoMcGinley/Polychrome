@@ -18,21 +18,21 @@ Atom wm_protos;
 Atom wm_delete;
 
 
-static int initialise(void);
+static int init(void);
 
 int main(void) {
 
 	//if initialisation failed, exit with error
-	if(!initialise()) {
+	if(!init()) {
 		return 1;	
 	}
 
-	event_loop();
+	handleEvents();
 	return 0;
 }
 
 // Look for windows that already exist 
-static void scan_wins(void)
+static void scanWins(void)
 {
     unsigned int nwins, i;
     Window dummyw1, dummyw2, *wins;
@@ -49,7 +49,7 @@ static void scan_wins(void)
 
 
 
-static int initialise() {
+static int init() {
 
     if(!(dpy = XOpenDisplay(0x0))) {
 		return 0;
@@ -144,7 +144,7 @@ static int initialise() {
 
     pointerorigin.subwindow = None;
 
-	scan_wins();
+	scanWins();
 	return 1;
 }
 
