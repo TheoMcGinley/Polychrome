@@ -88,30 +88,42 @@ extern Atom wm_delete;
 
 // FUNCTIONS {{{
 // events.c
-extern void event_loop(void);
+extern void eventLoop(void);
+
+// hide.c
+extern void hideFocusedWindow();
+extern void hide(Window);
+extern void showNextHidden();
+extern void setWindowState(Window win, int state);
 
 // utils.c 
-extern void start_app(const char *);
-extern int color_to_pixel_value(int);
-extern void set_new_window_dimensions(int);
-extern void increment_focused_size(void);
-extern void decrement_focused_size(void);
-extern void halve_focused_size(void);
-extern void double_focused_size(void);
-extern void reset_focused_border(void);
-extern void focus_client(Client*);
-extern void focus_new_client(void);
-extern void focus_color(int);
-extern void destroy_focused_client(void);
-extern Client* add_to_clientlist(Window, struct Position, int, int, int);
+extern void startApp(const char *);
+extern int colorToPixelValue(int);
+extern int windowExists(Window);
+
+// size.c
+extern void setNewWindowDimensions(int);
+extern struct Position getNewWindowDimension();
+extern void incrementFocusedSize(void);
+extern void decrementFocusedSize(void);
+extern void halveFocusedSize(void);
+extern void doubleFocusedSize(void);
+
+// focus.c
+extern void resetFocusedBorder(void);
+extern void focusClient(Client*);
+extern void focusNewClient(void);
+extern void focusColor(int);
+
+// manage.c
+extern void destroyFocusedClient(void);
+extern Client* addToClientlist(Window, struct Position, int, int, int);
+
 //unused?
-extern int window_exists(Window);
-extern int handle_xerror(Display *, XErrorEvent *);
+//extern int handleXerror(Display *, XErrorEvent *);
 
 //scoring.c
-//extern double calculate_score(int[][], int, int, int, int);
-//extern double calculate_score(int**, int, int, int, int);
-extern double calculate_score(int, int, int, int);
-extern struct Position find_best_position (int, int);
+extern double calculateScore(int, int, int, int);
+extern struct Position findBestPosition (int, int);
 // END_FUNCTIONS }}}
 #endif // POLYCHROME_H

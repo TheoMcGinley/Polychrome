@@ -133,7 +133,7 @@ static void handleKeyPress(XKeyEvent *e) {
 				startApp("firefox");
 				break;
 			case 65:
-				hideActiveWindow();
+				hideFocusedWindow();
 				break;
 		}
 	}
