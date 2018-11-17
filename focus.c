@@ -1,21 +1,29 @@
 // all functions dealing with focus and changes of focus may be found below
 #include "polychrome.h" 
-void resetFocusedBorder() {
+
+// set the border of the focused window back to its regular color
+static void resetFocusedBorder() {
 	if (focused != NULL)
 		XSetWindowBorder(dpy, focused->id, colorToPixelValue(focused->color));
 }
 
+// focus the specified client, setting its border to the focus colour
 void focusClient(Client *c) {
+	resetFocusedBorder();
 	XRaiseWindow(dpy, c->id);
 	XSetInputFocus(dpy, c->id, RevertToParent, CurrentTime);
 	XSetWindowBorder(dpy, c->id, FOCUSCOLOR);
 	focused = c;
 }
 
+
+// focus a window of the specified colour
+// if the current focused window is of the same colour, focus the next window
+// in the list of the same colour
 void focusColor(int color) {
 
 	//if no windows of given colour exist, don't do anything
-	Client *c = &clientlist[color];
+	Client *c = &clientList[color];
 	if (c->next == NULL) {
 		return;
 	}
@@ -38,7 +46,6 @@ void focusColor(int color) {
 	 * 	and return
 	*/
 
-	resetFocusedBorder();
 
 	c = c->next;
 	Client *firstclient = c;
@@ -57,11 +64,11 @@ void focusColor(int color) {
 }
 
 
-// cycle through windowlists until an unfocused window is found
-void focusNewClient() {
+// cycle through lists until an unfocused window is found
+void focusUnfocusedClient() {
 	Client *c;
 	for (int i=0; i<NUMCOLORS; i++) {
-		c = &clientlist[i];
+		c = &clientList[i];
 		if (c->next != NULL && c->next->id != focused->id) {
 			c = c->next;
 			focusClient(c);
@@ -70,5 +77,4 @@ void focusNewClient() {
 	}
 	focused = NULL;
 }
-
 

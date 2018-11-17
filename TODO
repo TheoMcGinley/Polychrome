@@ -1,7 +1,7 @@
 == TODO ==
 
-1) Project refactor 
-	move window creation and deletion to manage.c
+1) fix:
+	- when creating multiple windows and deleting one of them, badWindow error
 
 2) Implement hide:
 	- start with hiding.c

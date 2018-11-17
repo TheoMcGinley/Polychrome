@@ -22,6 +22,32 @@ int colorToPixelValue(int color) {
 	return 0;
 }
 
+//updateType is either ADD or REMOVE (1 or -1 respectively)
+void updateGrid(IntTuple position, IntTuple clientDimensions, int updateType) {
+	for (int i=0; i<GRIDWIDTH; i++) {
+		for (int j=0; j<GRIDHEIGHT; j++) {
+			if ( i >= position.x && i < (position.x + clientDimensions.x) && 
+			  	 j >= position.y && j < (position.y + clientDimensions.y)) {
+					grid[i][j] += updateType;
+			}
+		}
+	}
+}
+
+
+//find the least used colour
+int rarestColour() {
+	int minValue = colorTracker[0];
+	int minColor = 0;
+	for (int i=1; i<NUMCOLORS; i++) {
+		if (colorTracker[i] < minValue) {
+			minValue = colorTracker[i];
+			minColor = i;
+		}
+	}
+	return minColor;
+}
+
 /* it is in situations such as this that a structure such as a hashmap would
  * have been much superior to an array of linkedlists, being O(1) rather than
  * O(n). However, as n (being the number of windows) is never significantly
@@ -32,7 +58,7 @@ int windowExists(Window w) {
 	Client *c;
 
 	for (int i=0; i<NUMCOLORS; i++) {
-		c = &clientlist[i];
+		c = &clientList[i];
 
 		//if list empty, go to next list 
 		if (c->next == NULL) {

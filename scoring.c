@@ -1,17 +1,14 @@
 #include "polychrome.h"
 #include "limits.h"
 
-static double calcBlockingScore(int windowx, int windowy, int windowwidth, int windowheight) {
+// add a penalty of 100 for each cell that the new window would overlap with
+// existing windows - ensures minimum overlap
+static double calcBlockingScore(IntTuple position, IntTuple dimensions) {
 	double score = 0;
-	//for each cell
 	for (int i=0; i<GRIDWIDTH; i++) {
 		for (int j=0; j<GRIDHEIGHT; j++) {
-			//2 checks:
-			// 	1) i is between (inclusive) windowx and (windowx+windowwidth)
-			// 	2) j is between (inclusive) windowy and (windowy+windowheight)
-			//TODO check edge conditions here
-			if ( i >= windowx && i < (windowx+windowwidth) && 
-			  	 j >= windowy && j < (windowy+windowheight)) {
+			if ( i >= position.x && i < (position.x + dimensions.x) && 
+			  	 j >= position.y && j < (position.y + dimensions.y)) {
 					score += (grid[i][j])*100;
 			}
 		}
@@ -19,48 +16,57 @@ static double calcBlockingScore(int windowx, int windowy, int windowwidth, int w
 	return score;
 }
 
-static int isOffscreen(int windowx, int windowy, int windowwidth, int windowheight) {
-	if ((windowx + windowwidth) > GRIDWIDTH || (windowy + windowheight) > GRIDHEIGHT)
+// determines if putting the window in the given position would result in the
+// window being at least partially offscreen
+static int isOffscreen(IntTuple position, IntTuple dimensions) {
+	if ((position.x + dimensions.x) > GRIDWIDTH || 
+			(position.y + dimensions.y) > GRIDHEIGHT)
 		return 1;	
 	return 0;
 }
 
-static double calcPositionalScore(int windowx, int windowy, int windowwidth, int windowheight) {
-	//find perfect spot given window dimensions
-	int perfectx = (GRIDWIDTH/2)-(windowwidth/2);
-	int perfecty = (GRIDHEIGHT/2)-(windowheight/2);
-
-	//manhattan distance away from perfect spot is score
-	return abs(perfectx-windowx) + abs(perfecty-windowy);
+// calcPositionScores prefers windows closer to the centre of the screen - 
+// Manhattan distance away from the centre is the penalty
+static double calcPositionalScore(IntTuple position, IntTuple dimensions) {
+	int perfectX = (GRIDWIDTH/2)  - (dimensions.x/2);
+	int perfectY = (GRIDHEIGHT/2) - (dimensions.y/2);
+	return abs(perfectX - position.x) + abs(perfectY - position.y);
 }
 
-//windowwidth, windowheight uses cells as its unit
-double calculateScore(int windowx, int windowy, int windowwidth, int windowheight) {
-	if (is_offscreen(windowx, windowy, windowwidth, windowheight)) 
+/* calculateScore prioritises:
+ * 1) not putting a window offscreen
+ * 2) not overlapping windows
+ * 3) putting the window as close to the centre as possible
+ */
+static double calculateScore(IntTuple position, IntTuple dimensions) {
+	if (isOffscreen(position, dimensions)) 
 		return INT_MAX;
-	return calcBlockingScore(windowx, windowy, windowwidth, windowheight) +
-	       calcPositionalScore(windowx, windowy, windowwidth, windowheight);
+	return calcBlockingScore(position, dimensions) + 
+	       calcPositionalScore(position, dimensions);
 }
 
-struct Position findBestPosition (int windowwidth, int windowheight) {
-	struct Position bestposition;
-	bestposition.x = 0;
-	bestposition.y = 0;
-	double bestscore, tmpscore;
-	//bestscore = tmpscore = calculate_score(0, 0, windowwidth, windowheight);
-	bestscore = tmpscore = calculateScore(0, 0, windowwidth, windowheight);
+// given the dimensions of the window to add, find the best place to put it
+IntTuple findBestPosition (IntTuple dimensions) {
+	IntTuple bestPosition, tmpPosition;
+	double bestScore, tmpScore;
 
+	bestPosition.x = 0;
+	bestPosition.y = 0;
+	bestScore = tmpScore = calculateScore(bestPosition, dimensions);
+
+	// lower scores are better
 	for (int i=0; i<GRIDWIDTH; i++) {
 		for (int k=0; k<GRIDHEIGHT; k++) {
-			//tmpscore = calculate_score(i, k, windowwidth, windowheight);
-			tmpscore = calculateScore(i, k, windowwidth, windowheight);
-			if (tmpscore < bestscore) {
-				bestscore = tmpscore;
-				bestposition.x = i;
-				bestposition.y = k;
+			tmpPosition.x = i;
+			tmpPosition.y = k;
+			tmpScore = calculateScore(tmpPosition, dimensions);
+			if (tmpScore < bestScore) {
+				bestScore = tmpScore;
+				bestPosition.x = i;
+				bestPosition.y = k;
 			}
 		}
 	}
-	printf("bestscore: %f\n", bestscore);
-	return bestposition;
+	printf("bestscore: %f\n", bestScore);
+	return bestPosition;
 }

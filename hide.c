@@ -1,6 +1,8 @@
 // all hiding/reshowing functions can be found below
 #include "polychrome.h" 
-#include <X11/Xmd.h>
+#include <X11/Xmd.h> //needed for CARD32
+
+static void setWindowState(Window, int);
 
 // SHAMELESSLY STOLEN FROM AEWM
 //TODO push window to stack
@@ -10,9 +12,8 @@ void hideFocusedWindow() {
 }
 
 void hide(Window win) {
-	removeWindow(win)
+	removeWindow(win);
     setWindowState(win, IconicState);
-
 }
 
 void showNextHidden() {
@@ -20,7 +21,7 @@ void showNextHidden() {
 	//setWindowState(stack.pop()->id, NormalState)
 }
 
-void setWindowState(Window win, int state) {
+static void setWindowState(Window win, int state) {
     CARD32 data[2];
 
     data[0] = state;

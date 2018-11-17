@@ -8,7 +8,6 @@ static void handleWindowDestruction(XDestroyWindowEvent *);
 static void handleMotion(XMotionEvent *);
 static void handleWindowMap(XMapEvent *);
 static void handleClientMessage(XClientMessageEvent *);
-static void removeWindow(Window);
 
 void handleEvents() {
 	XEvent ev;
@@ -49,12 +48,12 @@ void handleEvents() {
 static void handleButtonPress(XButtonEvent *e) {
 	if (e->subwindow != None) {
 		XGetWindowAttributes(dpy, e->subwindow, &attr);
-		pointerorigin = *e;
+		pointerOrigin = *e;
 	}
 }
 
 static void handleButtonRelease(XButtonEvent *e) {
-	pointerorigin.subwindow = None;
+	pointerOrigin.subwindow = None;
 }
 
 static void printStatus() {
@@ -147,59 +146,8 @@ static void handleWindowMap(XMapEvent *e) {
 		return;
 	}
 
-	addNewWindow(XMapEvent *e);
+	addNewWindow(e);
 
-	//find rarest color and update tracker
-	int minvalue = colortracker[0];
-	int mincolor = 0;
-	for (int i=1; i<NUMCOLORS; i++) {
-		if (colortracker[i] < minvalue) {
-			minvalue = colortracker[i];
-			mincolor = i;
-		}
-	}
-
-	colortracker[mincolor] = colortracker[mincolor] + 1;
-	XSetWindowBorderWidth(e->display, e->window, BORDERTHICKNESS);
-
-	//set border of old focus back to regular color
-	resetFocusedBorder();
-
-	// clientDimensions.x refers to width, clientDimensions.y refers to height
-	struct Position clientDimensions = getNewWindowDimensions();
-
-	/* find the best position for the window using the scoring system, then move
-	it there, accounting for border thickness */
-	struct Position pos = findBestPosition(clientDimensions.x, clientDimensions.y);
-	XMoveResizeWindow(dpy, e->window, (pos.x*CELLWIDTH)+BORDERTHICKNESS,
-			(pos.y*CELLHEIGHT)+BORDERTHICKNESS, (clientDimensions.x*CELLWIDTH)-(2*BORDERTHICKNESS),
-			(clientDimensions.y*CELLHEIGHT)-(2*BORDERTHICKNESS));
-	printf("x: %d, y: %d\n", pos.x, pos.y);
-
-	//populate_grid
-	for (int i=0; i<GRIDWIDTH; i++) {
-		for (int j=0; j<GRIDHEIGHT; j++) {
-			if ( i >= pos.x && i < (pos.x+clientwidth) && 
-			  	 j >= pos.y && j < (pos.y+clientheight)) {
-					grid[i][j] += 1;
-			}
-		}
-	}
-
-	//add window to relevant linked list
-	Client *c = addToClientlist(e->window, pos, clientwidth, clientheight, mincolor);
-
-	//print grid
-	for (int i=0; i<16; i++) {
-		for (int j=0; j<16; j++) {
-			printf("%d ", grid[j][i]);
-		}
-		printf("\n");
-	}
-
-	focus_client(c);
-	//TODO make this a setting
-	newdimensions = REGULAR;
 }
 
 /* we only get motion events when a button is being pressed,
@@ -241,14 +189,14 @@ static void handleMotion(XMotionEvent *e) {
 	 *
 	*/
 
-	if (pointerorigin.subwindow != None) {
-		int xdiff = e->x_root - pointerorigin.x_root;
-		int ydiff = e->y_root - pointerorigin.y_root;
-		XMoveResizeWindow(dpy, pointerorigin.subwindow,
-			attr.x + (pointerorigin.button==1 ? xdiff : 0),
-			attr.y + (pointerorigin.button==1 ? ydiff : 0),
-			MAX(1, attr.width + (pointerorigin.button==3 ? xdiff : 0)),
-			MAX(1, attr.height + (pointerorigin.button==3 ? ydiff : 0)));
+	if (pointerOrigin.subwindow != None) {
+		int xdiff = e->x_root - pointerOrigin.x_root;
+		int ydiff = e->y_root - pointerOrigin.y_root;
+		XMoveResizeWindow(dpy, pointerOrigin.subwindow,
+			attr.x + (pointerOrigin.button==1 ? xdiff : 0),
+			attr.y + (pointerOrigin.button==1 ? ydiff : 0),
+			MAX(1, attr.width + (pointerOrigin.button==3 ? xdiff : 0)),
+			MAX(1, attr.height + (pointerOrigin.button==3 ? ydiff : 0)));
 	}
 }
 
@@ -262,11 +210,8 @@ static void handleUnmapEvent(XUnmapEvent *e) {
 		removeWindow(e->window);
 }
 
-// All that is required by ICCM is iconify (hide)
+// All that is required by ICCCM is iconify (hide)
 static void handleClientMessage(XClientMessageEvent *e) {
-	printf("PRETENDING TO HIDE\n");
-    /*client_t *c = find_client(e->window, MATCH_WINDOW);*/
-
     if (e->message_type == wm_change_state && 
 			e->format == 32 && e->data.l[0] == IconicState) {
 		hide(e->window);

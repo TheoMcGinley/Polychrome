@@ -3,10 +3,10 @@
 
 // INCLUDES {{{
 #include <X11/Xlib.h>
-#include <stdio.h> //printf
-#include <unistd.h> //NULL, exit, fork, sleep
-#include <stdlib.h> //NULL, malloc, free, exit, system
-#include <paths.h>
+#include <stdio.h>  // used for: printf
+#include <unistd.h> // used for: NULL, exit, fork, sleep
+#include <stdlib.h> // used for: NULL, malloc, free, exit, system
+#include <paths.h>  // used for: ???
 // END_INCLUDES }}}
 
 // DEFINES {{{
@@ -28,21 +28,33 @@
 
 #define BORDERTHICKNESS 10
 
+// used when populating/depopulating the grid
+#define ADD 1
+#define REMOVE -1
+
+// definitions for hiding - can't find where to import them from
+#define WithdrawnState 0
+#define NormalState 1
+#define IconicState 3
+
+
 
 // END_DEFINES }}}
 
 // STRUCTS {{{
 
-struct Position {
+// used for positions and dimensions
+struct IntTuple {
 	int x;
 	int y;
 };
+struct IntTuple;
+typedef struct IntTuple IntTuple;
 
 struct Client {
 	Window id;
-	struct Position pos;
-	int width;
-	int height;
+	IntTuple position;
+	IntTuple dimensions;
 	int color;
 	struct Client *next;
 };
@@ -68,62 +80,64 @@ struct workspacestate {
 extern Display * dpy;
 //extern Window root;
 extern XWindowAttributes attr;
-extern XButtonEvent pointerorigin;
-extern int colortracker[NUMCOLORS];
-extern Client clientlist[NUMCOLORS];
+extern XButtonEvent pointerOrigin;
+extern int colorTracker[NUMCOLORS];
+extern Client clientList[NUMCOLORS];
 extern Client *focused;
 extern int grid[GRIDWIDTH][GRIDHEIGHT];
 //extern int nextsize;
 //extern int nextorientation;
-extern enum NewWindowDimensions newdimensions;
+extern enum NewWindowDimensions newDimensions;
 
 extern Atom wm_state;
 extern Atom wm_change_state;
 extern Atom wm_protos;
 extern Atom wm_delete;
 
-
-
 // END_GLOBALS }}}
 
 // FUNCTIONS {{{
-// events.c
-extern void eventLoop(void);
+
+// debug.c
+extern void printGrid();
+
+// eventHandlers.c
+extern void handleEvents();
+
+// focus.c
+extern void focusClient(Client*);
+extern void focusColor(int);
+extern void focusUnfocusedClient();
+extern void showNextHidden();
 
 // hide.c
 extern void hideFocusedWindow();
 extern void hide(Window);
 extern void showNextHidden();
-extern void setWindowState(Window win, int state);
 
-// utils.c 
-extern void startApp(const char *);
-extern int colorToPixelValue(int);
-extern int windowExists(Window);
+// manage.c
+extern void addNewWindow(XMapEvent *);
+extern void destroyFocusedClient();
+extern Client* addToClientList(Window, IntTuple, IntTuple, int);
+extern void removeWindow(Window);
+
+//scoring.c
+extern IntTuple findBestPosition (IntTuple);
 
 // size.c
 extern void setNewWindowDimensions(int);
-extern struct Position getNewWindowDimension();
+extern IntTuple getNewWindowDimensions();
 extern void incrementFocusedSize(void);
 extern void decrementFocusedSize(void);
 extern void halveFocusedSize(void);
 extern void doubleFocusedSize(void);
 
-// focus.c
-extern void resetFocusedBorder(void);
-extern void focusClient(Client*);
-extern void focusNewClient(void);
-extern void focusColor(int);
+// utils.c 
+extern void startApp(const char *);
+extern int colorToPixelValue(int);
+extern int windowExists(Window);
+extern int rarestColour();
+extern void updateGrid(IntTuple, IntTuple, int);
 
-// manage.c
-extern void destroyFocusedClient(void);
-extern Client* addToClientlist(Window, struct Position, int, int, int);
-
-//unused?
-//extern int handleXerror(Display *, XErrorEvent *);
-
-//scoring.c
-extern double calculateScore(int, int, int, int);
-extern struct Position findBestPosition (int, int);
 // END_FUNCTIONS }}}
 #endif // POLYCHROME_H

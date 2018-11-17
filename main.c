@@ -1,16 +1,17 @@
 #include "polychrome.h"
 
+// globals defining window manager state
 Display * dpy;
 
 XWindowAttributes attr;
-XButtonEvent pointerorigin;
+XButtonEvent pointerOrigin;
 
-int colortracker[NUMCOLORS];
-Client clientlist[NUMCOLORS];
+int colorTracker[NUMCOLORS];
+Client clientList[NUMCOLORS];
 Client *focused;
 int grid[GRIDWIDTH][GRIDHEIGHT];
 
-enum NewWindowDimensions newdimensions;
+enum NewWindowDimensions newDimensions;
 
 Atom wm_state;
 Atom wm_change_state;
@@ -32,8 +33,7 @@ int main(void) {
 }
 
 // Look for windows that already exist 
-static void scanWins(void)
-{
+static void scanWins() {
     unsigned int nwins, i;
     Window dummyw1, dummyw2, *wins;
     XWindowAttributes attr;
@@ -70,9 +70,9 @@ static int init() {
 
 	//initialise the linked lists and colortracker
 	for (int i=0;i<NUMCOLORS;i++) {
-		colortracker[i] = 0;
-		clientlist[i].id = UNDEFINED;
-		clientlist[i].next = NULL;
+		colorTracker[i] = 0;
+		clientList[i].id = UNDEFINED;
+		clientList[i].next = NULL;
 	}
 
 	for (int i=0; i<GRIDWIDTH; i++) {
@@ -83,7 +83,7 @@ static int init() {
 
 	//TODO potentially set other fields of focused?
 	focused = NULL;
-	newdimensions = REGULAR;
+	newDimensions = REGULAR;
 	/*focused.id = UNDEFINED;
 	focused.color = UNDEFINED;*/
 
@@ -142,7 +142,7 @@ static int init() {
             DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
 
 
-    pointerorigin.subwindow = None;
+    pointerOrigin.subwindow = None;
 
 	scanWins();
 	return 1;

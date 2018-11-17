@@ -2,7 +2,7 @@ PREFIX?=/usr/X11R6
 CFLAGS?=-Os -pedantic -Wall
 
 all:
-	$(CC) $(CFLAGS) -I$(PREFIX)/include eventHandlers.c focus.c hide.c main.c manage.c scoring.c size.c utils.c polychrome.h -L$(PREFIX)/lib -lX11 -o polychrome
+	$(CC) $(CFLAGS) -I$(PREFIX)/include debug.c eventHandlers.c focus.c hide.c main.c manage.c scoring.c size.c utils.c polychrome.h -L$(PREFIX)/lib -lX11 -o polychrome
 
 install:
 	test -d $(DESTDIR)/bin || mkdir -p $(DESTDIR)/bin

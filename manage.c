@@ -1,11 +1,44 @@
-//if client acknowledges ICCCM's WM_DELETE_WINDOW, close it nicely, else KILL
-// calling this will in turn call an unmap and/or window destruction, removing
+#include "polychrome.h"
+
+void addNewWindow(XMapEvent *e) {
+
+	//find rarest color and update tracker
+	int borderColor = rarestColour();
+	colorTracker[borderColor] = colorTracker[borderColor] + 1;
+
+	XSetWindowBorderWidth(e->display, e->window, BORDERTHICKNESS);
+
+	IntTuple clientDimensions = getNewWindowDimensions();
+
+	/* find the best position for the window using the scoring system, then move
+	it there, accounting for border thickness */
+	IntTuple clientPosition = findBestPosition(clientDimensions);
+
+	XMoveResizeWindow(dpy, e->window,
+			(clientPosition.x * CELLWIDTH)  + BORDERTHICKNESS,
+			(clientPosition.y * CELLHEIGHT) + BORDERTHICKNESS,
+			(clientDimensions.x * CELLWIDTH)  - (2 * BORDERTHICKNESS), 
+			(clientDimensions.y * CELLHEIGHT) - (2 * BORDERTHICKNESS));
+
+
+	//add window to relevant color's linked list
+	Client *c = addToClientList(e->window, clientPosition, clientDimensions, borderColor);
+
+	updateGrid(clientPosition, clientDimensions, ADD);
+	printGrid();
+	focusClient(c);
+
+	//TODO make this a setting
+	newDimensions = REGULAR;
+}
+
+// if client acknowledges ICCCM's WM_DELETE_WINDOW, close it nicely, else KILL
+// Calling this will in turn call an unmap and/or window destruction, removing
 // it from the grid
 void destroyFocusedClient() {
 	//please don't try and kill the root window
 	if (focused == NULL) return;
 
-	//TODO found here is always 0??
     int i, n, found = 0;
     Atom *protocols;
 
@@ -13,7 +46,7 @@ void destroyFocusedClient() {
         for (i=0; i<n; i++) if (protocols[i] == wm_delete) found++;
         XFree(protocols);
     }
-    if (found){
+    if (found) {
 		//from: https://nachtimwald.com/2009/11/08/sending-wm_delete_window-client-messages/
 		XEvent ev;
 		ev.xclient.type = ClientMessage;
@@ -28,42 +61,44 @@ void destroyFocusedClient() {
 	}
 }
 
-Client*  addToClientList(Window w, struct Position wpos, int wwidth, int wheight, int wcolor) {
-	Client *c = &clientlist[wcolor];
+
+Client*  addToClientList(Window win, IntTuple position, IntTuple dimensions, int color) {
+
+	// go to the end of the relevant clientList
+	Client *c = &clientList[color];
 	while (c->next != NULL) {
 		c = c->next;
 	}
 
-	Client *newclient = malloc(sizeof(*newclient));
-	newclient->id = w;
-	newclient->pos = wpos;
-	newclient->width = wwidth;
-	newclient->height = wheight;
-	newclient->color = wcolor;
-	newclient->next = NULL;
-	c->next = newclient;
-	return newclient;
+	// create the new client, attach it to the end of the list and return it
+	Client *newClient = malloc(sizeof(*newClient));
+	newClient->id = win;
+	newClient->position = position;
+	newClient->dimensions = dimensions;
+	newClient->color = color;
+	newClient->next = NULL;
+	c->next = newClient;
+	return newClient;
 }
 
 
 //removes deleted window from linkedlist and colortracker
-static void removeWindow(Window win) {
+void removeWindow(Window win) {
 
 
 	printf("WIN: %lx\n", win);
 
-	//TODO surely this could refocus the same window? check this
 	if (win == focused->id) {
-		focusNewClient();
+		focusUnfocusedClient();
 	}
 
-	int windowfound = 0;
+	int windowFound = 0;
 	Client *c;
-	Client *clienttofree = NULL;
+	Client *removedClient = NULL;
 
-	//find and remove client from linked lists
-	for (int i=0; i<NUMCOLORS && !windowfound; i++) {
-		c = &clientlist[i];
+	//find and remove the client from linked lists
+	for (int i=0; i<NUMCOLORS && !windowFound; i++) {
+		c = &clientList[i];
 
 		//if list empty, go to next list 
 		if (c->next == NULL) {
@@ -72,8 +107,8 @@ static void removeWindow(Window win) {
 
 		while (c->next != NULL) {
 			if (c->next->id == win) {
-				clienttofree = c->next;
-				windowfound = 1;
+				removedClient = c->next;
+				windowFound = 1;
 				/*if the node to delete has a next node, set current next to
 				that node, else node to delete is last in list so can set current
 				next to NULL */
@@ -82,26 +117,17 @@ static void removeWindow(Window win) {
 				} else {
 					c->next = NULL;
 				}
+
 				//remove window from colortracker
-				colortracker[i] = colortracker[i] - 1;
+				colorTracker[i] = colorTracker[i] - 1;
 				break;
 			}
 			c = c->next;
 		}
 	}
 
-	if (clienttofree != NULL) {
-
-		//de-populate grid
-		for (int i=0; i<GRIDWIDTH; i++) {
-			for (int j=0; j<GRIDHEIGHT; j++) {
-				if ( i >= clienttofree->pos.x && i < (clienttofree->pos.x + clienttofree->width) && 
-					 j >= clienttofree->pos.y && j < (clienttofree->pos.y + clienttofree->height)) {
-						grid[i][j] -= 1;
-				}
-			}
-		}
-		free(clienttofree);
+	if (removedClient != NULL) {
+		updateGrid(removedClient->position, removedClient->dimensions, REMOVE);
+		free(removedClient);
 	}
-
 }
