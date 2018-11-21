@@ -86,7 +86,7 @@ Client*  addToClientList(Window win, IntTuple position, IntTuple dimensions, int
 void removeWindow(Window win) {
 
 
-	printf("WIN: %lx\n", win);
+	printf("removing window: %lx\n", win);
 
 	if (win == focused->id) {
 		focusUnfocusedClient();

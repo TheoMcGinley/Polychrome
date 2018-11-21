@@ -73,6 +73,7 @@ static void handleKeyPress(XKeyEvent *e) {
 				return;
 			case 65: //shift+space
 				showNextHidden();
+				return;
 		}
 	}
 	

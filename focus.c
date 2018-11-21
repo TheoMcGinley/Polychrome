@@ -7,13 +7,20 @@ static void resetFocusedBorder() {
 		XSetWindowBorder(dpy, focused->id, colorToPixelValue(focused->color));
 }
 
-// focus the specified client, setting its border to the focus colour
-void focusClient(Client *c) {
-	resetFocusedBorder();
+// NoReset is required when focusing a new window after a window is deleted
+// as otherwise would be calling XSetWindowBorder on a non-existent window
+static void focusClientNoReset(Client *c) {
 	XRaiseWindow(dpy, c->id);
 	XSetInputFocus(dpy, c->id, RevertToParent, CurrentTime);
 	XSetWindowBorder(dpy, c->id, FOCUSCOLOR);
 	focused = c;
+	printf("focused window: %lx\n", c->id);
+}
+
+// focus the specified client, setting its border to the focus colour
+void focusClient(Client *c) {
+	resetFocusedBorder();
+	focusClientNoReset(c);
 }
 
 
@@ -27,6 +34,9 @@ void focusColor(int color) {
 	if (c->next == NULL) {
 		return;
 	}
+
+	// reset the border colour of the old focused window before starting
+	resetFocusedBorder();
 
 	/*2 scenarios: 
 	 * 	1) trying to focus new window of same colour as current
@@ -71,10 +81,11 @@ void focusUnfocusedClient() {
 		c = &clientList[i];
 		if (c->next != NULL && c->next->id != focused->id) {
 			c = c->next;
-			focusClient(c);
+			focusClientNoReset(c);
 			return;
 		}
 	}
+
 	focused = NULL;
 }
 

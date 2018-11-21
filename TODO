@@ -1,7 +1,6 @@
 == TODO ==
 
-1) fix:
-	- when creating multiple windows and deleting one of them, badWindow error
+1) Try to find better alternative than NoReset
 
 2) Implement hide:
 	- start with hiding.c
