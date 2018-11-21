@@ -1,12 +1,5 @@
 == TODO ==
 
-1) Try to find better alternative than NoReset
-
-2) Implement hide:
-	- start with hiding.c
-	- make a stack local to hiding.c
-	- when hide called
-
 3) Handle configurerequests
 	- refer to aewm
 

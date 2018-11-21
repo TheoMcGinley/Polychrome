@@ -115,10 +115,14 @@ static void handleKeyPress(XKeyEvent *e) {
 				//start_app("java -jar ~/vlt/RuneLite.jar");
 				setNewWindowDimensions(REGULAR);
 				break;
+			case 31: // "i"
+				hideFocusedWindow();
+				break;
+			case 32: // "o"
+				showNextHidden();
+				break;
 			case 33: // "p"
-				//start_app("scrot -u ~/pix/scrots/%Y-%m-%d-%T-screenshot.png");
 				setNewWindowDimensions(PORTRAIT);
-				//print_status();
 				break;
 			case 52: // "z"
 				startApp("mpc toggle -q");
@@ -131,9 +135,6 @@ static void handleKeyPress(XKeyEvent *e) {
 				break;
 			case 56: // "b"
 				startApp("firefox");
-				break;
-			case 65:
-				hideFocusedWindow();
 				break;
 		}
 	}
