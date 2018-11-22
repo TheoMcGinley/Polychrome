@@ -1,5 +1,13 @@
 == TODO ==
 
+1) implement workspaces
+	- only removeWindow on a destruction, do nothing on an unmap
+
+
+	- if leaving workspaces, unmap all
+	- if entering workspace, map all
+	- make updateGrid take workspaceToUpdate as a param at the end
+
 3) Handle configurerequests
 	- refer to aewm
 

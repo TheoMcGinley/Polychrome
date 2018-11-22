@@ -56,10 +56,6 @@ static void handleButtonRelease(XButtonEvent *e) {
 	pointerOrigin.subwindow = None;
 }
 
-static void printStatus() {
-	printf("focused.id: %lx,\n", focused->id);
-}
-
 //use xev to find correct keysyms
 static void handleKeyPress(XKeyEvent *e) {
 	//SHIFT + MOD
@@ -101,6 +97,18 @@ static void handleKeyPress(XKeyEvent *e) {
 				break;
 			case 43: // "h"
 				incrementFocusedSize();
+				break;
+			case 44: // "j"
+				switchToWorkspace(0);
+				break;
+			case 45: // "k"
+				switchToWorkspace(1);
+				break;
+			case 46: // "l"
+				switchToWorkspace(2);
+				break;
+			case 47: // ";"
+				switchToWorkspace(3);
 				break;
 			case 24: // "q"
 				destroyFocusedClient();
@@ -203,13 +211,21 @@ static void handleMotion(XMotionEvent *e) {
 }
 
 static void handleWindowDestruction(XDestroyWindowEvent *e) {
-	if (windowExists(e->window))
+	if (windowExists(e->window)) {
+		printf("DESTRUCT EXISTS\n");
 		removeWindow(e->window);
+	} else {
+		printf("DESTRUCT DOESN'T EXISTS\n");
+	}
 }
 
 static void handleUnmapEvent(XUnmapEvent *e) {
-	if (windowExists(e->window))
+	/* if (windowExists(e->window)) {
+		printf("UNMAP EXISTS\n");
 		removeWindow(e->window);
+	} else {
+		printf("UNMAP DOESNT EXIST\n");
+	} */
 }
 
 // All that is required by ICCCM is iconify (hide)

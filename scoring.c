@@ -9,7 +9,7 @@ static double calcBlockingScore(IntTuple position, IntTuple dimensions) {
 		for (int j=0; j<GRIDHEIGHT; j++) {
 			if ( i >= position.x && i < (position.x + dimensions.x) && 
 			  	 j >= position.y && j < (position.y + dimensions.y)) {
-					score += (grid[i][j])*100;
+					score += (CWS.grid[i][j])*100;
 			}
 		}
 	}
@@ -46,6 +46,7 @@ static double calculateScore(IntTuple position, IntTuple dimensions) {
 }
 
 // given the dimensions of the window to add, find the best place to put it
+// for the current workspace
 IntTuple findBestPosition (IntTuple dimensions) {
 	IntTuple bestPosition, tmpPosition;
 	double bestScore, tmpScore;

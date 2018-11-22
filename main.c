@@ -6,10 +6,8 @@ Display * dpy;
 XWindowAttributes attr;
 XButtonEvent pointerOrigin;
 
-int colorTracker[NUMCOLORS];
-Client clientList[NUMCOLORS];
-Client *focused;
-int grid[GRIDWIDTH][GRIDHEIGHT];
+Workspace workspace[NUMWORKSPACES];
+int currentWorkspace;
 
 enum NewWindowDimensions newDimensions;
 
@@ -55,37 +53,37 @@ static int init() {
 		return 0;
 	}
 
-	//root = RootWindow(dpy, DefaultScreen(dpy));
-	//printf("ROOT: %lx\n", root);
-	//start_app("feh --bg-tile -z /home/theo/pix/backgrounds/tiling/");
-
-	//XSetErrorHandler(handle_xerror);
-
 	//ICCCM, taken from aewm
     wm_protos = XInternAtom(dpy, "WM_PROTOCOLS", False);
     wm_delete = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
     wm_state = XInternAtom(dpy, "WM_STATE", False);
     wm_change_state = XInternAtom(dpy, "WM_CHANGE_STATE", False);
 
+	currentWorkspace = 0;
 
-	//initialise the linked lists and colortracker
-	for (int i=0;i<NUMCOLORS;i++) {
-		colorTracker[i] = 0;
-		clientList[i].id = UNDEFINED;
-		clientList[i].next = NULL;
-	}
-
-	for (int i=0; i<GRIDWIDTH; i++) {
-		for (int j=0; j<GRIDHEIGHT; j++) {
-			grid[i][j] = 0;
+	//for each workspace, initialise the linked lists and colortracker
+	for (int j=0;j<NUMWORKSPACES;j++) {
+		for (int i=0;i<NUMCOLORS;i++) {
+			workspace[j].colorTracker[i] = 0;
+			workspace[j].clientList[i].id = UNDEFINED;
+			workspace[j].clientList[i].next = NULL;
 		}
 	}
 
-	//TODO potentially set other fields of focused?
-	focused = NULL;
+	//for each workspace, initialise the grid
+	for (int k=0;k<NUMWORKSPACES;k++) {
+		for (int i=0; i<GRIDWIDTH; i++) {
+			for (int j=0; j<GRIDHEIGHT; j++) {
+				workspace[k].grid[i][j] = 0;
+			}
+		}
+	}
+
+	for (int i=0;i<NUMWORKSPACES;i++) {
+		workspace[i].focused = NULL;
+	}
+
 	newDimensions = REGULAR;
-	/*focused.id = UNDEFINED;
-	focused.color = UNDEFINED;*/
 
 	//make all children of root give out notify events
 	XSelectInput (dpy, RootWindow(dpy, DefaultScreen(dpy)), SubstructureNotifyMask);    
@@ -148,6 +146,15 @@ static int init() {
     XGrabKey(dpy, XKeysymToKeycode(dpy, XStringToKeysym("h")), ShiftMask|Mod1Mask,
             DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
 
+	// workspaces 
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XStringToKeysym("j")), Mod1Mask,
+            DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XStringToKeysym("k")), Mod1Mask,
+            DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XStringToKeysym("l")), Mod1Mask,
+            DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy, XKeysymToKeycode(dpy, XStringToKeysym(";")), Mod1Mask,
+            DefaultRootWindow(dpy), True, GrabModeAsync, GrabModeAsync);
 
     pointerOrigin.subwindow = None;
 

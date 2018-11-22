@@ -13,6 +13,7 @@ static struct StackNode {
 };
 struct StackNode;
 typedef struct StackNode StackNode;
+
 static StackNode *root = NULL;
 
 static StackNode* newNode(Window win) {
@@ -55,17 +56,24 @@ static int peek(StackNode* root) {
 //TODO add these functions to polychrome
 void hideFocusedWindow() {
 	// don't hide root window!
-	if (focused == NULL) {
+	if (CWS.focused == NULL) {
 		return;
 	}
-	hide(focused->id);
+	hide(CWS.focused->id);
+}
+
+void unmap(Window win) {
+	XUnmapWindow(dpy, win);
+    setWindowState(win, IconicState);
+}
+
+void map(Window win) {
+	XMapWindow(dpy, win);
+	setWindowState(win, NormalState);
 }
 
 void hide(Window win) {
-	printf("Hiding window: %lx\n", win);
-	// removeWindow(win);
-	XUnmapWindow(dpy, win);
-    setWindowState(win, IconicState);
+	unmap(win);
 	push(&root, win);
 }
 
@@ -74,9 +82,7 @@ void showNextHidden() {
 		return;
 	}
 	Window win = pop(&root);
-	printf("Showing window: %lx\n", win);
-	XMapWindow(dpy, win);
-	setWindowState(win, NormalState);
+	map(win);
 }
 
 static void setWindowState(Window win, int state) {

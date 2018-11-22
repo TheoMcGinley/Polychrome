@@ -3,8 +3,8 @@
 
 // set the border of the focused window back to its regular color
 static void resetFocusedBorder() {
-	if (focused != NULL)
-		XSetWindowBorder(dpy, focused->id, colorToPixelValue(focused->color));
+	if (CWS.focused != NULL)
+		XSetWindowBorder(dpy, CWS.focused->id, colorToPixelValue(CWS.focused->color));
 }
 
 // NoReset is required when focusing a new window after a window is deleted
@@ -13,8 +13,7 @@ static void focusClientNoReset(Client *c) {
 	XRaiseWindow(dpy, c->id);
 	XSetInputFocus(dpy, c->id, RevertToParent, CurrentTime);
 	XSetWindowBorder(dpy, c->id, FOCUSCOLOR);
-	focused = c;
-	printf("focused window: %lx\n", c->id);
+	CWS.focused = c;
 }
 
 // focus the specified client, setting its border to the focus colour
@@ -30,7 +29,7 @@ void focusClient(Client *c) {
 void focusColor(int color) {
 
 	//if no windows of given colour exist, don't do anything
-	Client *c = &clientList[color];
+	Client *c = &CWS.clientList[color];
 	if (c->next == NULL) {
 		return;
 	}
@@ -61,7 +60,7 @@ void focusColor(int color) {
 	Client *firstclient = c;
 	while (c->next != NULL) {
 		//scenario 1)
-		if (c->id == focused->id) {
+		if (c->id == CWS.focused->id) {
 			c = c->next;
 			focusClient(c);
 			return;
@@ -78,14 +77,14 @@ void focusColor(int color) {
 void focusUnfocusedClient() {
 	Client *c;
 	for (int i=0; i<NUMCOLORS; i++) {
-		c = &clientList[i];
-		if (c->next != NULL && c->next->id != focused->id) {
+		c = &CWS.clientList[i];
+		if (c->next != NULL && c->next->id != CWS.focused->id) {
 			c = c->next;
 			focusClientNoReset(c);
 			return;
 		}
 	}
 
-	focused = NULL;
+	CWS.focused = NULL;
 }
 

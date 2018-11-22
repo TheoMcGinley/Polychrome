@@ -26,6 +26,9 @@
 #define CELLWIDTH 48 //for notebook
 #define CELLHEIGHT 27 //for notebook
 
+#define NUMWORKSPACES 4 
+
+#define CWS workspace[currentWorkspace]
 #define BORDERTHICKNESS 10
 
 // used when populating/depopulating the grid
@@ -44,12 +47,10 @@
 // STRUCTS {{{
 
 // used for positions and dimensions
-struct IntTuple {
+typedef struct IntTuple {
 	int x;
 	int y;
-};
-struct IntTuple;
-typedef struct IntTuple IntTuple;
+} IntTuple;
 
 struct Client {
 	Window id;
@@ -61,6 +62,13 @@ struct Client {
 
 struct Client;
 typedef struct Client Client;
+
+typedef struct Workspace {
+	int colorTracker[NUMCOLORS];
+	Client clientList[NUMCOLORS];
+	Client *focused;
+	int grid[GRIDWIDTH][GRIDHEIGHT];
+} Workspace;
 
 //use QUEENLY (portrait) so that it's QWER?
 enum NewWindowDimensions {REGULAR, PORTRAIT, WIDE, EXTRA};
@@ -78,15 +86,12 @@ struct workspacestate {
 // GLOBALS {{{
 
 extern Display * dpy;
-//extern Window root;
 extern XWindowAttributes attr;
 extern XButtonEvent pointerOrigin;
-extern int colorTracker[NUMCOLORS];
-extern Client clientList[NUMCOLORS];
-extern Client *focused;
-extern int grid[GRIDWIDTH][GRIDHEIGHT];
-//extern int nextsize;
-//extern int nextorientation;
+
+extern Workspace workspace[NUMWORKSPACES];
+extern int currentWorkspace;
+
 extern enum NewWindowDimensions newDimensions;
 
 extern Atom wm_state;
@@ -111,6 +116,8 @@ extern void focusUnfocusedClient();
 extern void showNextHidden();
 
 // hide.c
+extern void map(Window);
+extern void unmap(Window);
 extern void hideFocusedWindow();
 extern void hide(Window);
 extern void showNextHidden();
@@ -137,7 +144,10 @@ extern void startApp(const char *);
 extern int colorToPixelValue(int);
 extern int windowExists(Window);
 extern int rarestColour();
-extern void updateGrid(IntTuple, IntTuple, int);
+extern void updateGrid(IntTuple, IntTuple, int, int);
+
+// workspaces.c
+extern void switchToWorkspace(int);
 
 // END_FUNCTIONS }}}
 #endif // POLYCHROME_H
