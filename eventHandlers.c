@@ -156,6 +156,11 @@ static void handleWindowMap(XMapEvent *e) {
 		return;
 	}
 
+	// if the window is a utility, popup, etc, do not move + track it
+	if (shouldBeIgnored(e->window)) {
+		return;
+	}
+
 	addNewWindow(e);
 
 }
@@ -212,20 +217,14 @@ static void handleMotion(XMotionEvent *e) {
 
 static void handleWindowDestruction(XDestroyWindowEvent *e) {
 	if (windowExists(e->window)) {
-		printf("DESTRUCT EXISTS\n");
 		removeWindow(e->window);
-	} else {
-		printf("DESTRUCT DOESN'T EXISTS\n");
 	}
 }
 
 static void handleUnmapEvent(XUnmapEvent *e) {
-	/* if (windowExists(e->window)) {
-		printf("UNMAP EXISTS\n");
+	if (windowExists(e->window)) {
 		removeWindow(e->window);
-	} else {
-		printf("UNMAP DOESNT EXIST\n");
-	} */
+	}
 }
 
 // All that is required by ICCCM is iconify (hide)

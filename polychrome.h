@@ -21,10 +21,10 @@
 #define GRIDHEIGHT 16 
 //#define CELLWIDTH (WidthOfScreen()/GRIDSIZE) //TODO make these work
 //#define CELLHEIGHT (HeightOfScreen()/GRIDSIZE)
-//#define cellwidth 240 //for 4k
-//#define cellheight 135 //for 4k
-#define CELLWIDTH 48 //for notebook
-#define CELLHEIGHT 27 //for notebook
+#define CELLWIDTH 240 //for 4k
+#define CELLHEIGHT 135 //for 4k
+// #define CELLWIDTH 48 //for notebook
+// #define CELLHEIGHT 27 //for notebook
 
 #define NUMWORKSPACES 4 
 
@@ -145,6 +145,7 @@ extern int colorToPixelValue(int);
 extern int windowExists(Window);
 extern int rarestColour();
 extern void updateGrid(IntTuple, IntTuple, int, int);
+extern int shouldBeIgnored(Window);
 
 // workspaces.c
 extern void switchToWorkspace(int);

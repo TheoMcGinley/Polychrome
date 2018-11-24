@@ -16,7 +16,6 @@ Atom wm_change_state;
 Atom wm_protos;
 Atom wm_delete;
 
-
 static int init(void);
 
 int main(void) {
@@ -45,7 +44,17 @@ static void scanWins() {
     XFree(wins);
 }
 
+// fakeErrorHandler ensures that the wm does not halt on any errors
+int fakeErrorHandler(Display *d, XErrorEvent *e) {
+	char msg[80];
 
+	XGetErrorText(d, e->error_code, msg, sizeof(msg));
+
+	fprintf(stderr, "Error %d (%s): request %d.%d\n",
+					e->error_code, msg, e->request_code,
+					e->minor_code);
+	return 0;
+}
 
 static int init() {
 
@@ -158,7 +167,9 @@ static int init() {
 
     pointerOrigin.subwindow = None;
 
+	XSetErrorHandler(fakeErrorHandler);
 	scanWins();
 	return 1;
 }
+
 

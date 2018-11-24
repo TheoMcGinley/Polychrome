@@ -81,6 +81,62 @@ int windowExists(Window w) {
 }
 
 
+// shouldBeIgnored determines if the window is a popup, dialogue box or
+// any other type of window which should not be tracked by the wm
+int shouldBeIgnored(Window win) {
+	Atom actualType;
+	int actualFormat, status;
+	unsigned long nItems, bytesAfter;
+	unsigned char *propReturn = NULL;
+
+	// iterate through window properties, see if _NET_WM_WINDOW_TYPE exists
+	int nProperties;
+	Bool windowProvidesWindowType = False;
+	Atom windowType = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", True);
+	Atom *windowProperties = XListProperties(dpy, win, &nProperties);
+	for (int i=0; i<nProperties; i++) {
+		if (windowProperties[i] == windowType) {
+			windowProvidesWindowType = True;
+		}
+	}
+
+	// if the client does not specify its window type, track it by default
+	if (!windowProvidesWindowType) {
+		return 0;
+	}
+
+
+	// adapted from xprop source code
+	status = XGetWindowProperty(dpy, win, windowType,
+			0L, sizeof(Atom), False, AnyPropertyType,
+			&actualType, &actualFormat, &nItems, &bytesAfter,
+			&propReturn);
+
+	// if the query fails, track the window by default
+	if (status != Success) {
+		XFree(propReturn);
+		return 0;
+	}
+
+	// clients may specify multiple window types - if any of them state
+	// that the window is a normal window then track as normal, else ignore
+	int ignoreWindow = 1;
+	Atom prop;
+	Atom NormalWindow = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_NORMAL", True);
+	char *name;
+	for (int i=0; i<nItems; i++) {
+		prop = ((Atom *)propReturn)[i];
+		if (prop == NormalWindow) {
+			ignoreWindow = 0;
+		}
+	}
+
+	XFree(propReturn);
+	return ignoreWindow;
+
+}
+
+
 //"handle" here means ignore
 int handleXerror(Display *dpy, XErrorEvent *e) {
 	printf("???\n");
